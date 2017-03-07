@@ -26,16 +26,16 @@ class DtlsSocket extends stream.Duplex {
 	}
 
 	get publicKey() {
-		return this.mbedSocket.publicKey || new Buffer(0);
+		return (this.mbedSocket && this.mbedSocket.publicKey) || new Buffer(0);
 	}
 	get publicKeyPEM() {
-		return this.mbedSocket.publicKeyPEM || new Buffer(0);
+		return (this.mbedSocket && this.mbedSocket.publicKeyPEM) || new Buffer(0);
 	}
 	get outCounter() {
-		return this.mbedSocket.outCounter;
+		return this.mbedSocket && this.mbedSocket.outCounter;
 	}
 	get session() {
-		return this.mbedSocket.session;
+		return this.mbedSocket && this.mbedSocket.session;
 	}
 
 	get sendClose() {
