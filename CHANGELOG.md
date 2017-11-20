@@ -1,3 +1,7 @@
+# 2.4.7 - 20 Nov 2017
+
+* increased the maximum DTLS packet size from 768 to 800 bytes
+
 # 2.4.4
 
 * Add some debug loggin
