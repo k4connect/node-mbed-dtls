@@ -171,12 +171,9 @@ DtlsClientSocket::DtlsClientSocket(
   *   devices will only support a single ciphersuite, which may not be in this list.
   * Therefore....
   * TODO: Might-could automatically scope this down based on the provded credentials.
+  * gpolakow: limited to the cipher supported by coap-gateway
   */
-  allowed_ciphersuites[0] = MBEDTLS_TLS_PSK_WITH_AES_128_CCM_8;   // IoTivity
-  allowed_ciphersuites[1] = MBEDTLS_TLS_PSK_WITH_AES_128_CBC_SHA256;
-  allowed_ciphersuites[2] = MBEDTLS_TLS_ECDHE_PSK_WITH_AES_128_CBC_SHA256;
-  allowed_ciphersuites[3] = MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8;
-  allowed_ciphersuites[4] = MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CCM_8;
+  allowed_ciphersuites[0] = MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA;
 
   mbedtls_ssl_init(&ssl_context);
   mbedtls_x509_crt_init(&clicert);
