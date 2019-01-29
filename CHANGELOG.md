@@ -1,3 +1,7 @@
+# 2.5.0 - 29 Jan 2019
+
+* updating mbedtls submodule to 2.9.0
+
 # 2.4.7 - 20 Nov 2017
 
 * increased the maximum DTLS packet size from 768 to 800 bytes
