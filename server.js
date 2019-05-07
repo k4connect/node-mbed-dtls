@@ -116,8 +116,15 @@ class DtlsServer extends EventEmitter {
 						delete this.sockets[oldKey];
 						// tell the world
 						client.emit('ipChanged', oldRinfo);
+					}else{
+						//Do we need to jump out of lock state here too .. TBC (adding logging)?
+						this._debug(`message NOT successfully received NOT changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
 					}
 				});
+			}else{
+				this._debug(`device in move session lock state attempting to force it to re-handshake deviceID=${deviceId}`);
+				const malformedVerifyHelloRequest = new Buffer([0x16 , 0xfe , 0xfd , 0x00 , 0x01 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x2f , 0x00 , 0x2f, 0x03 , 0x00 , 0x00 , 0x23 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x23 , 0xfe , 0xfd , 0x20 , 0x5c , 0xd1 , 0x2a , 0xfc , 0x51 , 0x73 , 0x6f , 0x2c , 0x85 , 0x96 , 0x1a , 0xaa]);
+				this.dgramSocket.send(malformedVerifyHelloRequest, rinfo.port, rinfo.address);
 			}
 		});
 		return lookedUp;
