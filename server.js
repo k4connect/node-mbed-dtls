@@ -136,13 +136,13 @@ class DtlsServer extends EventEmitter {
 		
 		// Construct the 'session killing' Avada Kedavra packet
 		const malformedHelloRequest = new Buffer([
-			0x16 , 									// Handshake message type 22
-			0xfe, 0xfd, 							// DTLS 1.2
-			0x00, 0x01, 							// Epoch
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 	// Sequence number, works when set to anything, therefore chose 0x00
-			0x00, 0x10, 							// Data length, this has to be >= 16 (minumum) (deliberatly set to 0x10 (16) which is > the data length (2) that follows to force an mbed error on the device
-			0x00, 									// HandshakeType hello_request
-			0x00									// Handshake body, intentionally too short at a single byte
+			0x16,                                 // Handshake message type 22
+			0xfe, 0xfd,                           // DTLS 1.2
+			0x00, 0x01,                           // Epoch
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00,   // Sequence number, works when set to anything, therefore chose 0x00
+			0x00, 0x10,                           // Data length, this has to be >= 16 (minumum) (deliberatly set to 0x10 (16) which is > the data length (2) that follows to force an mbed error on the device
+			0x00,                                 // HandshakeType hello_request
+			0x00                                  // Handshake body, intentionally too short at a single byte
 		]);
 		
 		// Sending the malformed hello request back over the raw UDP socket
