@@ -104,9 +104,9 @@ class DtlsServer extends EventEmitter {
 				}
 
 				this._onMessage(msg, oldRinfo, (client, received) => {
+					const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
 					// if the message went through OK
 					if (received) {
-						const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
 						this._debug(`message successfully received, changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
 						// change IP
 						client.remoteAddress = rinfo.address;
