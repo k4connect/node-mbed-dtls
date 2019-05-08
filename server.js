@@ -116,7 +116,7 @@ class DtlsServer extends EventEmitter {
 						delete this.sockets[oldKey];
 						// tell the world
 						client.emit('ipChanged', oldRinfo);
-					}else{
+					} else {
 						//Do we need to jump out of lock state here too .. TBC (adding logging)?
 						this._debug(`message NOT successfully received NOT changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
 					}
