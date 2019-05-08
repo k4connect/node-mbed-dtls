@@ -20,7 +20,6 @@ class DtlsServer extends EventEmitter {
 		this.sockets = {};
 		this.dgramSocket = dgram.createSocket('udp4');
 		this._onMessage = this._onMessage.bind(this);
-		this._forceDeviceRehandshake = this._forceDeviceRehandshake.bind(this);
 		this.listening = false;
 
 		this.dgramSocket.on('message', this._onMessage);
@@ -133,21 +132,21 @@ class DtlsServer extends EventEmitter {
 	}
 
 	_forceDeviceRehandshake(rinfo, deviceId){
-		this._debug(`Attemting force re-handshake by sending Avada Kedavra packet to deviceID=${deviceId}`);
+		this._debug(`Attemting force re-handshake by sending malformed hello request packet to deviceID=${deviceId}`);
+		
 		// Construct the 'session killing' Avada Kedavra packet
-
-		// 0x16 										Handshake message type 22
-		// 0xfe, 0xfd									Mbed version 3.3
-		// 0x00, 0x01									Epoch
-		// 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00		Sequence number, works when set to anything, therefore chose zero
-		// 0x00, 0x10 									Data length has to be >= 16 (minumum) (deliberatly set to 0x10 (16)  which is > the data length (2) that follows to force an mbed error on the device
-		// 0x00 										First data packet : Handshake Message type 'Server Hello'		
-		// 0x00 										Remaining Fake Data set to 0x00s (could be anything) 
+		const malformedHelloRequest = new Buffer([
+			0x16 , 									// Handshake message type 22
+			0xfe, 0xfd, 							// DTLS 1.2
+			0x00, 0x01, 							// Epoch
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 	// Sequence number, works when set to anything, therefore chose 0x00
+			0x00, 0x10, 							// Data length, this has to be >= 16 (minumum) (deliberatly set to 0x10 (16) which is > the data length (2) that follows to force an mbed error on the device
+			0x00, 									// HandshakeType hello_request
+			0x00									// Handshake body, intentionally too short at a single byte
+		]);
 		
-		const malformedVerifyHelloRequest = new Buffer([0x16 , 0xfe, 0xfd, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00]);
-		
-		// Sending the Avada Kedavra packet back over the raw UDP socket
-		this.dgramSocket.send(malformedVerifyHelloRequest, rinfo.port, rinfo.address);
+		// Sending the malformed hello request back over the raw UDP socket
+		this.dgramSocket.send(malformedHelloRequest, rinfo.port, rinfo.address);
 	}
 
 	_attemptResume(client, msg, key, cb) {
