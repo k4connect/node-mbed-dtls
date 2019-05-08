@@ -121,9 +121,13 @@ class DtlsServer extends EventEmitter {
 						this._debug(`message NOT successfully received NOT changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
 					}
 				});
-			}else{
+			} else {
+				// In May 2019 some devices were stuck with bad sessions, never handshaking.
+				// https://app.clubhouse.io/particle/milestone/32301/manage-next-steps-associated-with-device-connectivity-issues-starting-may-2nd-2019
+				// This cloud-side solution was discovered by Eli Thomas which caused
+				// mbedTLS to fail a socket read and initiate a handshake.
 				this._debug(`Device in 'move session' lock state attempting to force it to re-handshake deviceID=${deviceId}`);
-				
+
 				//Always EMIT this event instead of calling _forceDeviceRehandshake internally this allows the DS to device wether to send the packet or not to the device
 				this.emit('forceDeviceRehandshake', rinfo, deviceId); 
 			}
