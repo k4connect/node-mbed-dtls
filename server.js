@@ -116,11 +116,41 @@ class DtlsServer extends EventEmitter {
 						delete this.sockets[oldKey];
 						// tell the world
 						client.emit('ipChanged', oldRinfo);
+					} else {
+						//Do we need to jump out of lock state here too .. TBC (adding logging)?
+						this._debug(`message NOT successfully received NOT changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
 					}
 				});
+			} else {
+				// In May 2019 some devices were stuck with bad sessions, never handshaking.
+				// https://app.clubhouse.io/particle/milestone/32301/manage-next-steps-associated-with-device-connectivity-issues-starting-may-2nd-2019
+				// This cloud-side solution was discovered by Eli Thomas which caused
+				// mbedTLS to fail a socket read and initiate a handshake.
+				this._debug(`Device in 'move session' lock state attempting to force it to re-handshake deviceID=${deviceId}`);
+
+				//Always EMIT this event instead of calling _forceDeviceRehandshake internally this allows the DS to device wether to send the packet or not to the device
+				this.emit('forceDeviceRehandshake', rinfo, deviceId); 
 			}
 		});
 		return lookedUp;
+	}
+
+	_forceDeviceRehandshake(rinfo, deviceId){
+		this._debug(`Attemting force re-handshake by sending malformed hello request packet to deviceID=${deviceId}`);
+		
+		// Construct the 'session killing' Avada Kedavra packet
+		const malformedHelloRequest = new Buffer([
+			0x16,                                 // Handshake message type 22
+			0xfe, 0xfd,                           // DTLS 1.2
+			0x00, 0x01,                           // Epoch
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00,   // Sequence number, works when set to anything, therefore chose 0x00
+			0x00, 0x10,                           // Data length, this has to be >= 16 (minumum) (deliberatly set to 0x10 (16) which is > the data length (2) that follows to force an mbed error on the device
+			0x00,                                 // HandshakeType hello_request
+			0x00                                  // Handshake body, intentionally too short at a single byte
+		]);
+		
+		// Sending the malformed hello request back over the raw UDP socket
+		this.dgramSocket.send(malformedHelloRequest, rinfo.port, rinfo.address);
 	}
 
 	_attemptResume(client, msg, key, cb) {
