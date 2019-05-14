@@ -94,49 +94,83 @@ class DtlsServer extends EventEmitter {
 
 	_handleIpChange(msg, key, rinfo, deviceId) {
 		const lookedUp = this.emit('lookupKey', deviceId, (err, oldRinfo) => {
+			// For an IpChange message to be considered successful it has to SUCCESSFULLY be 'received' by its client
 			if (!err && oldRinfo) {
-				// if the IP hasn't actually changed, handle normally
-				if (rinfo.address === oldRinfo.address &&
-						rinfo.port === oldRinfo.port) {
-					this._debug(`ignoring ip change because address did not change ip=${key}, deviceID=${deviceId}`);
-					this._onMessage(msg, rinfo);
+				const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
+				let client = this.sockets[oldKey];
+
+				//1) If this is a NEW (first time connection) on this address & port then we attempt to resume its session
+				if (!client) {
+					this._debug(`IpChange event recieved for a new client, attempting session resumption toip=${key} for deviceID=${deviceId}`);
+					// This creates a new client using the new address and port and 'attempts' session resumption
+					// If the message is delivered then we update our session information in redis for future incomming messages
+					// This bypasses _onMessage and calls _attemptResume
+					this.sockets[key] = client = this._createSocket(rinfo, key);
+					if (this._attemptResume(client, msg, key, (client, received) => {
+						if (received) {
+							this._debug(`IpChange message successfully received on new ip address during session resumption toip=${key}, deviceID=${deviceId}`);
+							this._updateSessionInformation(client, rinfo, oldRinfo);
+						} else {
+							//If the message wasn't able to be recieved on the new address and port OR the redis session key has been deleted
+							this._debug(`IpChange message NOT received on new ip address during session resumption toip=${key}, deviceID=${deviceId} forcing handshake`);
+							this.emit('forceDeviceRehandshake', rinfo, deviceId);
+						}
+					}));
 					return;
 				}
 
+				// 2) If the IP hasn't actually changed, then we will handle the incomming message normally but expect delivery 
+				if (rinfo.address === oldRinfo.address && rinfo.port === oldRinfo.port) {
+					this._debug(`IpChange ignoring ip change because address did not change ip=${key}, deviceID=${deviceId}`);
+					this._onMessage(msg, rinfo, (client, received) => {
+						if (!received) {
+							this._debug(`IpChange message NOT successfully received on same ip address ip=${key}, deviceID=${deviceId}`);
+							this.emit('forceDeviceRehandshake', rinfo, deviceId);
+						}
+					});
+					return;
+				}
+
+				// 3) If we have an existing client with a valid address and port, lets check our incoming messages security by sending it to the existing client
+				//    If the message is 'delivered' aka 'good crypto' then we update our session information in redis for future incomming messages
 				this._onMessage(msg, oldRinfo, (client, received) => {
-					const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
-					// if the message went through OK
+					// if the message went through OK to either the old client or the new client IP address
 					if (received) {
-						this._debug(`message successfully received, changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
-						// change IP
-						client.remoteAddress = rinfo.address;
-						client.remotePort = rinfo.port;
-						// move in lookup table
-						this.sockets[key] = client;
-						delete this.sockets[oldKey];
-						// tell the world
-						client.emit('ipChanged', oldRinfo);
+						this._debug(`IpChange message successfully received, changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
+						this._updateSessionInformation(client, rinfo, oldRinfo);
 					} else {
-						//Do we need to jump out of lock state here too .. TBC (adding logging)?
-						this._debug(`message NOT successfully received NOT changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
+						this._debug(`IpChange message NOT successfully received, NOT changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
+						this.emit('forceDeviceRehandshake', rinfo, deviceId);
 					}
 				});
+			
 			} else {
 				// In May 2019 some devices were stuck with bad sessions, never handshaking.
 				// https://app.clubhouse.io/particle/milestone/32301/manage-next-steps-associated-with-device-connectivity-issues-starting-may-2nd-2019
 				// This cloud-side solution was discovered by Eli Thomas which caused
 				// mbedTLS to fail a socket read and initiate a handshake.
 				this._debug(`Device in 'move session' lock state attempting to force it to re-handshake deviceID=${deviceId}`);
-
-				//Always EMIT this event instead of calling _forceDeviceRehandshake internally this allows the DS to device wether to send the packet or not to the device
 				this.emit('forceDeviceRehandshake', rinfo, deviceId); 
 			}
 		});
 		return lookedUp;
 	}
 
+	_updateSessionInformation(client, rinfo, oldRinfo){
+		const key = `${rinfo.address}:${rinfo.port}`;
+		const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
+		// Change IP
+		client.remoteAddress = rinfo.address;
+		client.remotePort = rinfo.port;
+		// Move in lookup table
+		this.sockets[key] = client;
+		delete this.sockets[oldKey];
+		// Tell the world
+		client.emit('ipChanged', oldRinfo);
+	}
+
 	_forceDeviceRehandshake(rinfo, deviceId){
-		this._debug(`Attemting force re-handshake by sending malformed hello request packet to deviceID=${deviceId}`);
+		this._debug(`Attempting force re-handshake by sending malformed hello request packet to deviceID=${deviceId}`);
 		
 		// Construct the 'session killing' Avada Kedavra packet
 		const malformedHelloRequest = new Buffer([
