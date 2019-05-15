@@ -102,7 +102,7 @@ class DtlsServer extends EventEmitter {
 					// like normal using the client we already had.
 					this._debug(`handleIpChange: ignoring ip change because address did not change ip=${key}, deviceID=${deviceId}`);
 					this._onMessage(msg, rinfo, (client, received) => {
-						// 'received' is true or false based on wether the message is pushed into the stream
+						// 'received' is true or false based on whether the message is pushed into the stream
 						if (!received) {
 							this.emit('forceDeviceRehandshake', rinfo, deviceId);
 						}
@@ -126,19 +126,19 @@ class DtlsServer extends EventEmitter {
 						});
 					}
 				
-					// This creates a new client using the new address and port and 'attempts' session resumption
-					// If the message is 'delivered' aka 'good crypto' then we update our session information in redis for future incomming messages
-					let client;
-					this.sockets[key] = client = this._createSocket(rinfo, key);
+					// This creates a new client using the new address and port and attempts session resumption
+					// If the message is 'received' then we update our session information in redis for future incomming messages
+					let client = this._createSocket(rinfo, key);
 					const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
-					// Resume session using from oldKey
+					// Resume session using oldKey
+					this._debug(`handleIpChange: attempting session resumption on newip=${key}, oldip=${oldKey} (from redis)`);
 					this._attemptResume(client, msg, oldKey, (client, received) => {
 						if (received) {
 							this._debug(`handleIpChange: message successfully received on new ip address during session resumption toip=${key}, deviceID=${deviceId}`);
 							this._updateSessionInformation(client, rinfo, oldRinfo);
 						} else {
 							//If the message wasn't able to be recieved on the new address and port OR the redis session key has been deleted
-							this._debug(`handleIpChange: message NOT received on new ip address during session resumption toip=${key}, deviceID=${deviceId} forcing handshake`);
+							this._debug(`handleIpChange: message NOT received on new ip address during session resumption toip=${key}, deviceID=${deviceId}`);
 							this.emit('forceDeviceRehandshake', rinfo, deviceId);
 						}
 					});
