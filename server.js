@@ -99,51 +99,51 @@ class DtlsServer extends EventEmitter {
 				const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
 				let client = this.sockets[oldKey];
 
-				//1) If this is a NEW (first time connection) on this address & port then we attempt to resume its session
-				if (!client) {
-					this._debug(`IpChange event recieved for a new client, attempting session resumption toip=${key} for deviceID=${deviceId}`);
-					// This creates a new client using the new address and port and 'attempts' session resumption
-					// If the message is delivered then we update our session information in redis for future incomming messages
-					// This bypasses _onMessage and calls _attemptResume
-					this.sockets[key] = client = this._createSocket(rinfo, key);
-					if (this._attemptResume(client, msg, key, (client, received) => {
-						if (received) {
-							this._debug(`IpChange message successfully received on new ip address during session resumption toip=${key}, deviceID=${deviceId}`);
-							this._updateSessionInformation(client, rinfo, oldRinfo);
-						} else {
-							//If the message wasn't able to be recieved on the new address and port OR the redis session key has been deleted
-							this._debug(`IpChange message NOT received on new ip address during session resumption toip=${key}, deviceID=${deviceId} forcing handshake`);
-							this.emit('forceDeviceRehandshake', rinfo, deviceId);
-						}
-					}));
-					return;
-				}
-
-				// 2) If the IP hasn't actually changed, then we will handle the incomming message normally but expect delivery 
 				if (rinfo.address === oldRinfo.address && rinfo.port === oldRinfo.port) {
-					this._debug(`IpChange ignoring ip change because address did not change ip=${key}, deviceID=${deviceId}`);
+					// The IP and port have not changed.
+					// The device just thought they might have.
+					// Strip the extra DTLS option and handle the message
+					// like normal using the client we already had.
+					this._debug(`handleIpChange: ignoring ip change because address did not change ip=${key}, deviceID=${deviceId}`);
 					this._onMessage(msg, rinfo, (client, received) => {
 						if (!received) {
-							this._debug(`IpChange message NOT successfully received on same ip address ip=${key}, deviceID=${deviceId}`);
+							this._debug(`handleIpChange: message NOT successfully received on same ip address ip=${key}, deviceID=${deviceId}`);
 							this.emit('forceDeviceRehandshake', rinfo, deviceId);
 						}
 					});
-					return;
-				}
 
-				// 3) If we have an existing client with a valid address and port, lets check our incoming messages security by sending it to the existing client
-				//    If the message is 'delivered' aka 'good crypto' then we update our session information in redis for future incomming messages
-				this._onMessage(msg, oldRinfo, (client, received) => {
-					// if the message went through OK to either the old client or the new client IP address
-					if (received) {
-						this._debug(`IpChange message successfully received, changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
-						this._updateSessionInformation(client, rinfo, oldRinfo);
-					} else {
-						this._debug(`IpChange message NOT successfully received, NOT changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
-						this.emit('forceDeviceRehandshake', rinfo, deviceId);
+					return;
+				} else {
+					// The IP and/or port have changed
+					// There should NOT already exist a socket on the new IP and port.
+					if (this.sockets[key]) {
+						// We should look up in redis, for the new IP and port,
+						// does the device ID match the one in this IP change message?
+						// If it matches, then we continue with _attemptResume below.
+						// If not, log something's wrong.
+						this.emit('lookupSource', key, (err, session) => {
+							if(session.deviceId && session.deviceId != deviceId){
+								this.debug(`handleIpChange: received conflict with an existing socket ip=${key} deviceID=${deviceId}, sessionDeviceId=${session.deviceId}`);
+								return;
+							}
+						});
 					}
-				});
-			
+				
+					// This creates a new client using the new address and port and 'attempts' session resumption
+					// If the message is 'delivered' aka 'good crypto' then we update our session information in redis for future incomming messages
+					this.sockets[key] = client = this._createSocket(rinfo, key);
+					// Resume session using from oldKey
+					this._attemptResume(client, msg, oldKey, (client, received) => {
+						if (received) {
+							this._debug(`handleIpChange: message successfully received on new ip address during session resumption toip=${key}, deviceID=${deviceId}`);
+							this._updateSessionInformation(client, rinfo, oldRinfo);
+						} else {
+							//If the message wasn't able to be recieved on the new address and port OR the redis session key has been deleted
+							this._debug(`handleIpChange: message NOT received on new ip address during session resumption toip=${key}, deviceID=${deviceId} forcing handshake`);
+							this.emit('forceDeviceRehandshake', rinfo, deviceId);
+						}
+					});
+				}				
 			} else {
 				// In May 2019 some devices were stuck with bad sessions, never handshaking.
 				// https://app.clubhouse.io/particle/milestone/32301/manage-next-steps-associated-with-device-connectivity-issues-starting-may-2nd-2019
