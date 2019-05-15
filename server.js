@@ -94,20 +94,16 @@ class DtlsServer extends EventEmitter {
 
 	_handleIpChange(msg, key, rinfo, deviceId) {
 		const lookedUp = this.emit('lookupKey', deviceId, (err, oldRinfo) => {
-			// For an IpChange message to be considered successful it has to SUCCESSFULLY be 'received' by its client
 			if (!err && oldRinfo) {
-				const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
-				let client = this.sockets[oldKey];
-
 				if (rinfo.address === oldRinfo.address && rinfo.port === oldRinfo.port) {
 					// The IP and port have not changed.
 					// The device just thought they might have.
-					// Strip the extra DTLS option and handle the message
+					// the extra DTLS option has been stripped already, handle the message as normal
 					// like normal using the client we already had.
 					this._debug(`handleIpChange: ignoring ip change because address did not change ip=${key}, deviceID=${deviceId}`);
 					this._onMessage(msg, rinfo, (client, received) => {
+						// 'received' is true or false based on wether the message is pushed into the stream
 						if (!received) {
-							this._debug(`handleIpChange: message NOT successfully received on same ip address ip=${key}, deviceID=${deviceId}`);
 							this.emit('forceDeviceRehandshake', rinfo, deviceId);
 						}
 					});
@@ -115,15 +111,16 @@ class DtlsServer extends EventEmitter {
 					return;
 				} else {
 					// The IP and/or port have changed
+
 					// There should NOT already exist a socket on the new IP and port.
 					if (this.sockets[key]) {
 						// We should look up in redis, for the new IP and port,
 						// does the device ID match the one in this IP change message?
 						// If it matches, then we continue with _attemptResume below.
-						// If not, log something's wrong.
+						// If not, log something's wrong and bail.
 						this.emit('lookupSource', key, (err, session) => {
-							if(session.deviceId && session.deviceId != deviceId){
-								this.debug(`handleIpChange: received conflict with an existing socket ip=${key} deviceID=${deviceId}, sessionDeviceId=${session.deviceId}`);
+							if(session && session.deviceId && session.deviceId != deviceId){
+								this._debug(`handleIpChange: received conflict with an existing socket ip=${key} deviceID=${deviceId}, sessionDeviceId=${session.deviceId}`);
 								return;
 							}
 						});
@@ -131,7 +128,9 @@ class DtlsServer extends EventEmitter {
 				
 					// This creates a new client using the new address and port and 'attempts' session resumption
 					// If the message is 'delivered' aka 'good crypto' then we update our session information in redis for future incomming messages
+					let client;
 					this.sockets[key] = client = this._createSocket(rinfo, key);
+					const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
 					// Resume session using from oldKey
 					this._attemptResume(client, msg, oldKey, (client, received) => {
 						if (received) {
@@ -149,7 +148,7 @@ class DtlsServer extends EventEmitter {
 				// https://app.clubhouse.io/particle/milestone/32301/manage-next-steps-associated-with-device-connectivity-issues-starting-may-2nd-2019
 				// This cloud-side solution was discovered by Eli Thomas which caused
 				// mbedTLS to fail a socket read and initiate a handshake.
-				this._debug(`Device in 'move session' lock state attempting to force it to re-handshake deviceID=${deviceId}`);
+				this._debug(`handleIpChange: Device in 'move session' lock state attempting to force it to re-handshake deviceID=${deviceId}`);
 				this.emit('forceDeviceRehandshake', rinfo, deviceId); 
 			}
 		});
