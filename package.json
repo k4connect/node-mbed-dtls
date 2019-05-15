@@ -1,6 +1,6 @@
 {
   "name": "node-mbed-dtls",
-  "version": "2.6.2-beta.0",
+  "version": "2.6.2-beta.1",
   "description": "Node mbed DTLS",
   "main": "index.js",
   "scripts": {
