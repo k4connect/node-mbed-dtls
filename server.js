@@ -119,7 +119,7 @@ class DtlsServer extends EventEmitter {
 						// If it matches, then we continue with _attemptResume below.
 						// If not, log something's wrong and bail.
 						this.emit('lookupSource', key, (err, session) => {
-							if(session && session.deviceId && session.deviceId != deviceId){
+							if (session && session.deviceId && session.deviceId !== deviceId) {
 								this._debug(`handleIpChange: received conflict with an existing socket ip=${key} deviceID=${deviceId}, sessionDeviceId=${session.deviceId}`);
 								return;
 							}
@@ -128,16 +128,17 @@ class DtlsServer extends EventEmitter {
 				
 					// This creates a new client using the new address and port and attempts session resumption
 					// If the message is 'received' then we update our session information in redis for future incomming messages
-					let client = this._createSocket(rinfo, key);
+					const client = this._createSocket(rinfo, key);
 					const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
 					// Resume session using oldKey
-					this._debug(`handleIpChange: attempting session resumption on newip=${key}, oldip=${oldKey} (from redis)`);
+					this._debug(`handleIpChange: attempting session resumption on newip=${key}, oldip=${oldKey}`);
 					this._attemptResume(client, msg, oldKey, (client, received) => {
 						if (received) {
 							this._debug(`handleIpChange: message successfully received on new ip address during session resumption toip=${key}, deviceID=${deviceId}`);
 							this._updateSessionInformation(client, rinfo, oldRinfo);
 						} else {
-							//If the message wasn't able to be recieved on the new address and port OR the redis session key has been deleted
+							// If the message wasn't able to be recieved on the new address and port 
+							// OR the redis session key has been deleted
 							this._debug(`handleIpChange: message NOT received on new ip address during session resumption toip=${key}, deviceID=${deviceId}`);
 							this.emit('forceDeviceRehandshake', rinfo, deviceId);
 						}
@@ -148,7 +149,7 @@ class DtlsServer extends EventEmitter {
 				// https://app.clubhouse.io/particle/milestone/32301/manage-next-steps-associated-with-device-connectivity-issues-starting-may-2nd-2019
 				// This cloud-side solution was discovered by Eli Thomas which caused
 				// mbedTLS to fail a socket read and initiate a handshake.
-				this._debug(`handleIpChange: Device in 'move session' lock state attempting to force it to re-handshake deviceID=${deviceId}`);
+				this._debug(`handleIpChange: deviceId key doesnt exist in redis or there was a redis error deviceID=${deviceId}`);
 				this.emit('forceDeviceRehandshake', rinfo, deviceId); 
 			}
 		});
