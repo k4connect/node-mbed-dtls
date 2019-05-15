@@ -109,30 +109,29 @@ class DtlsServer extends EventEmitter {
 					});
 
 					return;
-				} else {
-					// The IP and/or port have changed
-					// Attempt to send to oldRinfo which will 
-					// a) attempt session resumption (if the client with old address and port doesnt exist yet)
-					// b) attempt to send the message to the old old address and port
-					this._onMessage(msg, oldRinfo, (client, received) => {
-						const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
-						// if the message went through OK
-						if (received) {
-							this._debug(`handleIpChange: message successfully received, changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
-							// change IP
-							client.remoteAddress = rinfo.address;
-							client.remotePort = rinfo.port;
-							// move in lookup table
-							this.sockets[key] = client;
-							delete this.sockets[oldKey];
-							// tell the world
-							client.emit('ipChanged', oldRinfo);
-						} else {
-							this._debug(`handleIpChange: message not successfully received, NOT changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
-							this.emit('forceDeviceRehandshake', rinfo, deviceId);
-						}
-					});
-				}				
+				}
+				// The IP and/or port have changed
+				// Attempt to send to oldRinfo which will 
+				// a) attempt session resumption (if the client with old address and port doesnt exist yet)
+				// b) attempt to send the message to the old old address and port
+				this._onMessage(msg, oldRinfo, (client, received) => {
+					const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
+					// if the message went through OK
+					if (received) {
+						this._debug(`handleIpChange: message successfully received, changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
+						// change IP
+						client.remoteAddress = rinfo.address;
+						client.remotePort = rinfo.port;
+						// move in lookup table
+						this.sockets[key] = client;
+						delete this.sockets[oldKey];
+						// tell the world
+						client.emit('ipChanged', oldRinfo);
+					} else {
+						this._debug(`handleIpChange: message not successfully received, NOT changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
+						this.emit('forceDeviceRehandshake', rinfo, deviceId);
+					}
+				});
 			} else {
 				// In May 2019 some devices were stuck with bad sessions, never handshaking.
 				// https://app.clubhouse.io/particle/milestone/32301/manage-next-steps-associated-with-device-connectivity-issues-starting-may-2nd-2019
