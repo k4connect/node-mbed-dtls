@@ -111,35 +111,24 @@ class DtlsServer extends EventEmitter {
 					return;
 				} else {
 					// The IP and/or port have changed
-
-					// There should NOT already exist a socket on the new IP and port.
-					if (this.sockets[key]) {
-						// We should look up in redis, for the new IP and port,
-						// does the device ID match the one in this IP change message?
-						// If it matches, then we continue with _attemptResume below.
-						// If not, log something's wrong and bail.
-						this.emit('lookupSource', key, (err, session) => {
-							if (session && session.deviceId && session.deviceId !== deviceId) {
-								this._debug(`handleIpChange: received conflict with an existing socket ip=${key} deviceID=${deviceId}, sessionDeviceId=${session.deviceId}`);
-								return;
-							}
-						});
-					}
-				
-					// This creates a new client using the new address and port and attempts session resumption
-					// If the message is 'received' then we update our session information in redis for future incomming messages
-					const client = this._createSocket(rinfo, key);
-					const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
-					// Resume session using oldKey
-					this._debug(`handleIpChange: attempting session resumption on newip=${key}, oldip=${oldKey}`);
-					this._attemptResume(client, msg, oldKey, (client, received) => {
+					// Attempt to send to oldRinfo which will 
+					// a) attempt session resumption (if the client with old address and port doesnt exist yet)
+					// b) attempt to send the message to the old old address and port
+					this._onMessage(msg, oldRinfo, (client, received) => {
+						const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
+						// if the message went through OK
 						if (received) {
-							this._debug(`handleIpChange: message successfully received on new ip address during session resumption toip=${key}, deviceID=${deviceId}`);
-							this._updateSessionInformation(client, rinfo, oldRinfo);
+							this._debug(`handleIpChange: message successfully received, changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
+							// change IP
+							client.remoteAddress = rinfo.address;
+							client.remotePort = rinfo.port;
+							// move in lookup table
+							this.sockets[key] = client;
+							delete this.sockets[oldKey];
+							// tell the world
+							client.emit('ipChanged', oldRinfo);
 						} else {
-							// If the message wasn't able to be recieved on the new address and port 
-							// OR the redis session key has been deleted
-							this._debug(`handleIpChange: message NOT received on new ip address during session resumption toip=${key}, deviceID=${deviceId}`);
+							this._debug(`handleIpChange: message not successfully received, NOT changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
 							this.emit('forceDeviceRehandshake', rinfo, deviceId);
 						}
 					});
@@ -154,19 +143,6 @@ class DtlsServer extends EventEmitter {
 			}
 		});
 		return lookedUp;
-	}
-
-	_updateSessionInformation(client, rinfo, oldRinfo){
-		const key = `${rinfo.address}:${rinfo.port}`;
-		const oldKey = `${oldRinfo.address}:${oldRinfo.port}`;
-		// Change IP
-		client.remoteAddress = rinfo.address;
-		client.remotePort = rinfo.port;
-		// Move in lookup table
-		this.sockets[key] = client;
-		delete this.sockets[oldKey];
-		// Tell the world
-		client.emit('ipChanged', oldRinfo);
 	}
 
 	_forceDeviceRehandshake(rinfo, deviceId){
