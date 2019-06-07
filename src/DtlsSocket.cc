@@ -7,85 +7,82 @@
 #include "mbedtls/ssl_internal.h"
 #include "mbedtls/pk.h"
 
-using namespace node;
+using namespace Napi;
 
-Nan::Persistent<v8::FunctionTemplate> DtlsSocket::constructor;
+Napi::FunctionReference DtlsSocket::constructor;
 
-void
-DtlsSocket::Initialize(Nan::ADDON_REGISTER_FUNCTION_ARGS_TYPE target) {
-	Nan::HandleScope scope;
+Napi::Value DtlsSocket::Initialize(Napi::Env& env, Napi::Object& exports) {
+	Napi::HandleScope scope(env);
 
 	// Constructor
-	v8::Local<v8::FunctionTemplate> ctor = Nan::New<v8::FunctionTemplate>(DtlsSocket::New);
-	constructor.Reset(ctor);
-	v8::Local<v8::ObjectTemplate>	ctorInst = ctor->InstanceTemplate();
-	ctorInst->SetInternalFieldCount(1);
-	ctor->SetClassName(Nan::New("DtlsSocket").ToLocalChecked());
-	
-	Nan::SetPrototypeMethod(ctor, "receiveData", ReceiveDataFromNode);
-	Nan::SetPrototypeMethod(ctor, "close", Close);
-	Nan::SetPrototypeMethod(ctor, "send", Send);
-	Nan::SetPrototypeMethod(ctor, "resumeSession", ResumeSession);
-	Nan::SetPrototypeMethod(ctor, "renegotiate", Renegotiate);
+	Napi::Function func = DefineClass(env, "SessionWrap", {
+		InstanceMethod("receiveData", &DtlsSocket::ReceiveDataFromNode),
+		InstanceMethod("close", &DtlsSocket::Close),
+		InstanceMethod("send", &DtlsSocket::Send),
+		InstanceMethod("resumeSession", &DtlsSocket::ResumeSession),
+		InstanceMethod("renegotiate", &DtlsSocket::Renegotiate),
+		InstanceAccessor("publicKey", &DtlsSocket::GetPublicKey, &DtlsSocket::NopSet),
+		InstanceAccessor("publicKeyPEM", &DtlsSocket::GetPublicKeyPEM, &DtlsSocket::NopSet),
+		InstanceAccessor("outCounter", &DtlsSocket::GetOutCounter, &DtlsSocket::NopSet),
+		InstanceAccessor("session", &DtlsSocket::GetSession, &DtlsSocket::NopSet),
+	});
 
-	Nan::SetAccessor(ctorInst, Nan::New("publicKey").ToLocalChecked(), GetPublicKey);
-	Nan::SetAccessor(ctorInst, Nan::New("publicKeyPEM").ToLocalChecked(), GetPublicKeyPEM);
-	Nan::SetAccessor(ctorInst, Nan::New("outCounter").ToLocalChecked(), GetOutCounter);
-	Nan::SetAccessor(ctorInst, Nan::New("session").ToLocalChecked(), GetSession);
+	constructor = Napi::Persistent(func);
+	constructor.SuppressDestruct();
 
-	Nan::Set(target, Nan::New("DtlsSocket").ToLocalChecked(), ctor->GetFunction());
+	exports.Set("DtlsSocket", func);
+
+	return exports;
 }
 
-void DtlsSocket::New(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+
+Napi::Object DtlsSocket::New(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
 	if (info.Length() < 6) {
-		return Nan::ThrowTypeError("DtlsSocket requires six arguments");
+		Napi::TypeError::New(env, "DtlsSocket requires six arguments").ThrowAsJavaScriptException();
+		return Napi::Object::New(env);
 	}
 
 	// TODO check arguments types
 
-	DtlsServer *server = Nan::ObjectWrap::Unwrap<DtlsServer>(Nan::To<v8::Object>(info[0]).ToLocalChecked());
-	Nan::Utf8String client_ip(info[1]);
+	Napi::Object server = info[0].As<Napi::Object>();
+	Napi::Value client_ip = info[1].As<Napi::String>();
+	Napi::Function send_cb = info[2].As<Napi::Function>();
+	Napi::Function hs_cb = info[3].As<Napi::Function>();
+	Napi::Function error_cb = info[4].As<Napi::Function>();
+	Napi::Function resume_cb = info[5].As<Napi::Function>();
 
-	Nan::Callback* send_cb = new Nan::Callback(info[2].As<v8::Function>());
-	Nan::Callback* hs_cb = new Nan::Callback(info[3].As<v8::Function>());
-	Nan::Callback* error_cb = new Nan::Callback(info[4].As<v8::Function>());
-	Nan::Callback* resume_cb = new Nan::Callback(info[5].As<v8::Function>());
+	Napi::Object obj = constructor.New({ server, client_ip, send_cb, hs_cb, error_cb, resume_cb });
 
-	DtlsSocket *socket = new DtlsSocket(server,
-																			(unsigned char *)*client_ip,
-																			client_ip.length(),
-																			send_cb,
-																			hs_cb,
-																			error_cb,
-																			resume_cb);
-	socket->Wrap(info.This());
-	info.GetReturnValue().Set(info.This());
+	return obj;
 }
 
-void DtlsSocket::ReceiveDataFromNode(const Nan::FunctionCallbackInfo<v8::Value>& info) {
-	DtlsSocket *socket = Nan::ObjectWrap::Unwrap<DtlsSocket>(info.This());
-	
-	if (info.Length() >= 1 && Buffer::HasInstance(info[0])) {
-		const unsigned char *recv_data = (const unsigned char *)Buffer::Data(info[0]);
-		size_t recv_len = Buffer::Length(info[0]);
+Napi::Value DtlsSocket::ReceiveDataFromNode(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
+
+	if (info.Length() >= 1 && info[0].IsBuffer()) {
+		Napi::Buffer<unsigned char> recv_buffer = info[0].As<Napi::Buffer<unsigned char>>();
+		const unsigned char *recv_data = (unsigned char *) recv_buffer.Data();
+		size_t recv_len = recv_buffer.Length();
 		socket->store_data(recv_data, recv_len);
 	}
 
 	int len = 1024;
-	unsigned char buf[len];	
+	unsigned char buf[len];
 	len = socket->receive_data(buf, len);
 
-	if (len > 0) {
-		info.GetReturnValue().Set(Nan::CopyBuffer((char*)buf, len).ToLocalChecked());
-	}
+	return len > 0 ? Napi::Buffer<unsigned char>::Copy(env, buf, len) : Napi::Object::New(env);
 }
 
-NAN_GETTER(DtlsSocket::GetPublicKey) {
-	DtlsSocket *socket = Nan::ObjectWrap::Unwrap<DtlsSocket>(info.This());
+Napi::Value DtlsSocket::GetPublicKey(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
 
 	mbedtls_ssl_session *session = socket->ssl_context.session;
 	if (session == NULL) {
-		return;
+		Napi::TypeError::New(env, "ssl_context.session was null").ThrowAsJavaScriptException();
+		return Napi::Object::New(env);
 	}
 	int ret;
 	const size_t buf_len = 256;
@@ -93,87 +90,98 @@ NAN_GETTER(DtlsSocket::GetPublicKey) {
 	mbedtls_pk_context pk = session->peer_cert->pk;
 	ret = mbedtls_pk_write_pubkey_der(&pk, buf, buf_len);
 	if (ret < 0) {
-		// TODO error?
-		return;
+		Napi::TypeError::New(env, "error in mbedtls_pk_write_pubkey_der").ThrowAsJavaScriptException();
+		return Napi::Object::New(env);
 	}
 
 	// key is written at the end
-	info.GetReturnValue().Set(Nan::CopyBuffer((char *)buf + (buf_len - ret), ret).ToLocalChecked());
+	return Napi::Buffer<char>::Copy(env, (char *)buf + (buf_len - ret), ret);
 }
 
-NAN_GETTER(DtlsSocket::GetPublicKeyPEM) {
-	DtlsSocket *socket = Nan::ObjectWrap::Unwrap<DtlsSocket>(info.This());
+Napi::Value DtlsSocket::GetPublicKeyPEM(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
 
 	mbedtls_ssl_session *session = socket->ssl_context.session;
 	if (session == NULL ||
-			session->peer_cert == NULL) {
-		return;
+		session->peer_cert == NULL) {
+		Napi::TypeError::New(env, "ssl_context.session was null").ThrowAsJavaScriptException();
+		return Napi::Object::New(env);
 	}
+
 	int ret;
 	const size_t buf_len = 256;
 	unsigned char buf[buf_len];
 	mbedtls_pk_context pk = session->peer_cert->pk;
 	ret = mbedtls_pk_write_pubkey_pem(&pk, buf, buf_len);
 	if (ret < 0) {
-		// TODO error?
-		return;
+		const char * message =  "error at mbedtls_pk_write_pubkey_pem";
+		return Napi::Buffer<const char>::Copy(env, message, strlen(message));
 	}
 
-	info.GetReturnValue().Set(Nan::CopyBuffer((char *)buf, strlen((const char *)buf)).ToLocalChecked());
+	return Napi::Buffer<const char>::Copy(env, (char *)buf, strlen((const char *)buf));
 }
 
-NAN_GETTER(DtlsSocket::GetOutCounter) {
-	DtlsSocket *socket = Nan::ObjectWrap::Unwrap<DtlsSocket>(info.This());
-	info.GetReturnValue().Set(Nan::CopyBuffer((char *)socket->ssl_context.out_ctr, 8).ToLocalChecked());
+Napi::Value DtlsSocket::GetOutCounter(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
+	return Napi::Buffer<char>::Copy(env, (char *)socket->ssl_context.out_ctr, 8);
 }
 
-NAN_GETTER(DtlsSocket::GetSession) {
-	DtlsSocket *socket = Nan::ObjectWrap::Unwrap<DtlsSocket>(info.This());
-	v8::Local<v8::Object> sess = SessionWrap::CreateFromContext(&socket->ssl_context, socket->random);
-	info.GetReturnValue().Set(sess);
+Napi::Value DtlsSocket::GetSession(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
+	Napi::Object sess = SessionWrap::CreateFromContext(env, &socket->ssl_context, socket->random);
+	return sess;
 }
 
-void DtlsSocket::Close(const Nan::FunctionCallbackInfo<v8::Value>& info) {
-	DtlsSocket *socket = Nan::ObjectWrap::Unwrap<DtlsSocket>(info.This());
+Napi::Value DtlsSocket::Close(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
 	int ret = socket->close();
-	if (ret < 0) {
-		// TODO error?
-		return;
-	}
 
-	info.GetReturnValue().Set(Nan::New(ret));
+	return Napi::Number::New(env, ret);
 }
 
-void DtlsSocket::Send(const Nan::FunctionCallbackInfo<v8::Value>& info) {
-	DtlsSocket *socket = Nan::ObjectWrap::Unwrap<DtlsSocket>(info.This());
-	
-	const unsigned char *send_data = (const unsigned char *)Buffer::Data(info[0]);
-	socket->send(send_data, Buffer::Length(info[0]));
+Napi::Value DtlsSocket::Send(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
+
+	Napi::Buffer<unsigned char> send_data_buffer = info[0].As<Napi::Buffer<unsigned char>>();
+	const unsigned char *send_data = (const unsigned char *) send_data_buffer.Data();
+	int ret = socket->send(send_data, send_data_buffer.Length());
+
+	return Napi::Number::New(env, ret);
 }
 
-void DtlsSocket::ResumeSession(const Nan::FunctionCallbackInfo<v8::Value>& info) {
-	DtlsSocket *socket = Nan::ObjectWrap::Unwrap<DtlsSocket>(info.This());
+Napi::Value DtlsSocket::ResumeSession(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
 
-	Nan::MaybeLocal<v8::Object> maybeSess = Nan::To<v8::Object>(info[0]);
-	if (maybeSess.IsEmpty()) {
-		return;
+	Napi::Object sessWrap = info[0].As<Napi::Object>();
+	if (sessWrap.IsEmpty()) {
+		Napi::TypeError::New(env, "ResumeSession requires one argument, was null").ThrowAsJavaScriptException();
+		return Napi::Object::New(env);
 	}
 
-	SessionWrap *sess = Nan::ObjectWrap::Unwrap<SessionWrap>(maybeSess.ToLocalChecked());
+	SessionWrap *sess = Napi::ObjectWrap<SessionWrap>::Unwrap(sessWrap);
 	bool ret = socket->resume(sess);
-	info.GetReturnValue().Set(Nan::New(ret));
+	return Napi::Number::New(env, ret);
 }
 
-void DtlsSocket::Renegotiate(const Nan::FunctionCallbackInfo<v8::Value>& info) {
-	DtlsSocket *socket = Nan::ObjectWrap::Unwrap<DtlsSocket>(info.This());
+Napi::Value DtlsSocket::Renegotiate(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
 
-	if (info[0]->IsUndefined()) {
+	if (info[0].IsUndefined()) {
 		socket->proceed();
-		return;
+		return Napi::Boolean::New(env, false);
 	}
 
-	SessionWrap *sess = Nan::ObjectWrap::Unwrap<SessionWrap>(Nan::To<v8::Object>(info[0]).ToLocalChecked());
+	SessionWrap *sess =  Napi::ObjectWrap<SessionWrap>::Unwrap(info[0].As<Napi::Object>());
 	socket->renegotiate(sess);
+
+	return Napi::Boolean::New(env, true);
 }
 
 int net_send( void *ctx, const unsigned char *buf, size_t len ) {
@@ -186,28 +194,26 @@ int net_recv( void *ctx, unsigned char *buf, size_t len ) {
 	return socket->recv(buf, len);
 }
 
-DtlsSocket::DtlsSocket(DtlsServer *server,
-											 unsigned char *client_ip,
-											 size_t client_ip_len, 
-											 Nan::Callback* send_callback,
-											 Nan::Callback* hs_callback,
-											 Nan::Callback* error_callback,
-											 Nan::Callback* resume_sess_callback)
-		: Nan::ObjectWrap(),		
-		send_cb(send_callback),
-		error_cb(error_callback),
-		handshake_cb(hs_callback),
-		resume_sess_cb(resume_sess_callback),
-		session_wait(false) {
+DtlsSocket::DtlsSocket(const Napi::CallbackInfo& info) :
+		Napi::ObjectWrap<DtlsSocket>(info),
+		env(info.Env()) {
+	DtlsServer *server = Napi::ObjectWrap<DtlsServer>::Unwrap(info[0].As<Napi::Object>());
+	std::string client_ip = (std::string) info[1].As<Napi::String>();
+	send_cb = info[2].As<Napi::Function>();
+	error_cb = info[3].As<Napi::Function>();
+	handshake_cb = info[4].As<Napi::Function>();
+	resume_sess_cb = info[5].As<Napi::Function>();
+	session_wait = false;
 	int ret;
 
-	if((ip = (unsigned char *)calloc(1, client_ip_len)) == NULL) {
+	if((ip = (unsigned char *)calloc(1, client_ip.length())) == NULL) {
 		throwError(MBEDTLS_ERR_SSL_ALLOC_FAILED);
 		return;
 	}
-	memcpy(ip, client_ip, client_ip_len);
-	ip_len = client_ip_len;
-	
+
+	memcpy(ip, client_ip.c_str(), client_ip.length());
+	ip_len = client_ip.length();
+
 	mbedtls_ssl_init(&ssl_context);
 	ssl_config = server->config();
 
@@ -243,7 +249,7 @@ bool DtlsSocket::resume(SessionWrap *sess) {
 	memcpy(ssl_context.out_ctr, sess->out_ctr, 8);
 	memcpy(ssl_context.handshake->randbytes, sess->randbytes, 64);
 	memcpy(ssl_context.session_negotiate->master, sess->master, 48);
-	
+
 	ssl_context.session_negotiate->id_len = sess->id_len;
 	memcpy(ssl_context.session_negotiate->id, sess->id, sess->id_len);
 
@@ -270,10 +276,10 @@ bool DtlsSocket::resume(SessionWrap *sess) {
 
 	ssl_context.session_in = ssl_context.session_negotiate;
 	ssl_context.session_out = ssl_context.session_negotiate;
-	
+
 	ssl_context.transform_in = ssl_context.transform_negotiate;
 	ssl_context.transform_out = ssl_context.transform_negotiate;
-	
+
 	mbedtls_ssl_handshake_wrapup(&ssl_context);
 
 	return true;
@@ -291,11 +297,11 @@ void DtlsSocket::reset() {
 }
 
 int DtlsSocket::send_encrypted(const unsigned char *buf, size_t len) {
-	v8::Local<v8::Value> argv[] = {
-		Nan::CopyBuffer((char *)buf, len).ToLocalChecked()
+	napi_value  argv[] = {
+		Napi::Buffer<char>::Copy(env, (char *)buf, len)
 	};
-	v8::Local<v8::Function> sendCallbackDirect = send_cb->GetFunction();
-	sendCallbackDirect->Call(Nan::GetCurrentContext()->Global(), 1, argv);
+
+	send_cb.Call(1, argv);
 	return len;
 }
 
@@ -327,7 +333,7 @@ int DtlsSocket::receive_data(unsigned char *buf, int len) {
 	int ret;
 
 	if (ssl_context.state == MBEDTLS_SSL_HANDSHAKE_OVER) {
-		// normal reading of unencrypted data	
+		// normal reading of unencrypted data
 		memset(buf, 0, len);
 		ret = mbedtls_ssl_read(&ssl_context, buf, len);
 		if (ret <= 0 && ret != MBEDTLS_ERR_SSL_WANT_READ) {
@@ -341,15 +347,13 @@ int DtlsSocket::receive_data(unsigned char *buf, int len) {
 }
 
 void DtlsSocket::get_session_cache(mbedtls_ssl_session *session) {
-	Nan::HandleScope scope;
 	session_wait = true;
 
-	v8::Local<v8::Object> session_id = Nan::CopyBuffer((const char *)session->id, session->id_len).ToLocalChecked();
-	const unsigned argc = 1;
-	v8::Local<v8::Value> argv[argc] = { session_id };
+	napi_value argv[] = {
+		Napi::String::New(env, (const char*) session->id, session->id_len)
+	};
 
-	v8::Local<v8::Function> resumeCallbackDirect = resume_sess_cb->GetFunction();
-	resumeCallbackDirect->Call(Nan::GetCurrentContext()->Global(), argc, argv);
+	resume_sess_cb.Call(1, argv);
 }
 
 void DtlsSocket::renegotiate(SessionWrap *sess) {
@@ -426,33 +430,32 @@ int DtlsSocket::step() {
 			return 0;
 		} else if (ret != 0) {
 			// bad things
-			error(ret);			
+			error(ret);
 			return 0;
 		}
 	}
 
 	// this should only be called once when we first finish the handshake
-	v8::Local<v8::Function> hsCallbackDirect = handshake_cb->GetFunction();
-	hsCallbackDirect->Call(Nan::GetCurrentContext()->Global(), 0, NULL);
+	napi_value argv[] = {};
+	handshake_cb.Call(0, argv);
 	return 0;
 }
 
 void DtlsSocket::throwError(int ret) {
 	char error_buf[100];
 	mbedtls_strerror(ret, error_buf, 100);
-	Nan::ThrowError(error_buf);
+	Napi::Error::New(env, error_buf).ThrowAsJavaScriptException();
 }
 
 void DtlsSocket::error(int ret) {
 	char error_buf[100];
 	mbedtls_strerror(ret, error_buf, 100);
-	v8::Local<v8::Value> argv[] = {
-		Nan::New(ret),
-		Nan::New(error_buf).ToLocalChecked()
+	napi_value argv[] = {
+		Napi::Number::New(env, ret),
+		Napi::String::New(env, error_buf)
 	};
 
-	v8::Local<v8::Function> errorCallbackDirect = error_cb->GetFunction();
-	errorCallbackDirect->Call(Nan::GetCurrentContext()->Global(), 2, argv);
+	error_cb.Call(2, argv);
 }
 
 void DtlsSocket::store_data(const unsigned char *buf, size_t len) {
@@ -468,19 +471,11 @@ int DtlsSocket::close() {
 }
 
 DtlsSocket::~DtlsSocket() {
-	delete send_cb;
-	send_cb = nullptr;
-	delete error_cb;
-	error_cb = nullptr;
-	delete handshake_cb;
-	handshake_cb = nullptr;
-	delete resume_sess_cb;
-	resume_sess_cb = nullptr;
-	ssl_config = nullptr;
 	if (ip != nullptr) {
 		free(ip);
 		ip = nullptr;
 	}
+
 	recv_buf = nullptr;
 	mbedtls_ssl_free(&ssl_context);
 }

@@ -1,30 +1,30 @@
 #ifndef __SESSION_WRAP_H__
 #define __SESSION_WRAP_H__
 
-#include <node.h>
-#include <nan.h>
+#include <napi.h>
 
 #include "mbedtls/ssl.h"
 
-class SessionWrap : public Nan::ObjectWrap {
+class SessionWrap : public Napi::ObjectWrap<SessionWrap> {
 public:
-	static void Initialize(Nan::ADDON_REGISTER_FUNCTION_ARGS_TYPE target);	
-	static v8::Local<v8::Object> CreateFromContext(mbedtls_ssl_context *ssl, uint8_t *random);
-	static void Restore(const Nan::FunctionCallbackInfo<v8::Value>& info);
-	static NAN_GETTER(GetCiphersuite);
-	static NAN_GETTER(GetRandomBytes);
-	static NAN_GETTER(GetId);
-	static NAN_GETTER(GetMaster);
-	static NAN_GETTER(GetInEpoch);
-	static NAN_GETTER(GetOutCounter);
+	static Napi::Object Initialize(Napi::Env& env, Napi::Object& exports);	
+	static Napi::Object CreateFromContext(Napi::Env env, mbedtls_ssl_context *ssl, uint8_t *random);
+	Napi::Value Restore(const Napi::CallbackInfo& info);
+	Napi::Value GetCiphersuite(const Napi::CallbackInfo& info);
+	Napi::Value GetRandomBytes(const Napi::CallbackInfo& info);
+	Napi::Value GetId(const Napi::CallbackInfo& info);
+	Napi::Value GetMaster(const Napi::CallbackInfo& info);
+	Napi::Value GetInEpoch(const Napi::CallbackInfo& info);
+	Napi::Value GetOutCounter(const Napi::CallbackInfo& info);
 
-	static NAN_SETTER(SetCiphersuite);
-	static NAN_SETTER(SetRandomBytes);
-	static NAN_SETTER(SetId);
-	static NAN_SETTER(SetMaster);
-	static NAN_SETTER(SetInEpoch);
-	static NAN_SETTER(SetOutCounter);
-	SessionWrap();
+	void SetCiphersuite(const Napi::CallbackInfo& info, const Napi::Value& value);
+	void SetRandomBytes(const Napi::CallbackInfo& info, const Napi::Value& value);
+	void SetId(const Napi::CallbackInfo& info, const Napi::Value& value);
+	void SetMaster(const Napi::CallbackInfo& info, const Napi::Value& value);
+	void SetInEpoch(const Napi::CallbackInfo& info, const Napi::Value& value);
+	void SetOutCounter(const Napi::CallbackInfo& info, const Napi::Value& value);
+	SessionWrap(const Napi::CallbackInfo& info);
+	~SessionWrap();
 
 	int ciphersuite;
 	unsigned char id[32];
@@ -35,11 +35,7 @@ public:
 	unsigned char out_ctr[8];
 	
 private:
-	~SessionWrap();
-
-	static void New(const Nan::FunctionCallbackInfo<v8::Value>& info);
-	static Nan::Persistent<v8::FunctionTemplate> constructor;
-	
+	static Napi::FunctionReference constructor;
 };
 
 #endif

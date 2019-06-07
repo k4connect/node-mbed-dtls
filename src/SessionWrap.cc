@@ -1,49 +1,35 @@
 #include "SessionWrap.h"
-
 #include <stdlib.h>
 
-using namespace node;
+Napi::FunctionReference SessionWrap::constructor;
 
-Nan::Persistent<v8::FunctionTemplate> SessionWrap::constructor;
+Napi::Object SessionWrap::Initialize(Napi::Env& env, Napi::Object& exports) {
+	Napi::HandleScope scope(env);
 
-void
-SessionWrap::Initialize(Nan::ADDON_REGISTER_FUNCTION_ARGS_TYPE target) {
-	Nan::HandleScope scope;
+	Napi::Function func = DefineClass(env, "SessionWrap", {
+		InstanceMethod("restore", &SessionWrap::Restore),
+		InstanceAccessor("ciphersuite", &SessionWrap::GetCiphersuite, &SessionWrap::SetCiphersuite),
+		InstanceAccessor("randbytes", &SessionWrap::GetRandomBytes, &SessionWrap::SetRandomBytes),
+		InstanceAccessor("id", &SessionWrap::GetId, &SessionWrap::SetId),
+		InstanceAccessor("master", &SessionWrap::GetMaster, &SessionWrap::SetMaster),
+		InstanceAccessor("in_epoch", &SessionWrap::GetInEpoch, &SessionWrap::SetInEpoch),
+		InstanceAccessor("out_ctr", &SessionWrap::GetOutCounter, &SessionWrap::SetOutCounter),
+	});
 
-	// Constructor
-	v8::Local<v8::FunctionTemplate> ctor = Nan::New<v8::FunctionTemplate>(SessionWrap::New);
-	constructor.Reset(ctor);
-	v8::Local<v8::ObjectTemplate>	ctorInst = ctor->InstanceTemplate();
-	ctorInst->SetInternalFieldCount(1);
-	ctor->SetClassName(Nan::New("SessionWrap").ToLocalChecked());
+	constructor = Napi::Persistent(func);
+	constructor.SuppressDestruct();
 
-	Nan::SetPrototypeMethod(ctor, "restore", Restore);
-
-	Nan::SetAccessor(ctorInst, Nan::New("ciphersuite").ToLocalChecked(), GetCiphersuite, SetCiphersuite);
-	Nan::SetAccessor(ctorInst, Nan::New("randbytes").ToLocalChecked(), GetRandomBytes, SetRandomBytes);
-	Nan::SetAccessor(ctorInst, Nan::New("id").ToLocalChecked(), GetId, SetId);
-	Nan::SetAccessor(ctorInst, Nan::New("master").ToLocalChecked(), GetMaster, SetMaster);
-	Nan::SetAccessor(ctorInst, Nan::New("in_epoch").ToLocalChecked(), GetInEpoch, SetInEpoch);
-	Nan::SetAccessor(ctorInst, Nan::New("out_ctr").ToLocalChecked(), GetOutCounter, SetOutCounter);
-
-	Nan::Set(target, Nan::New("SessionWrap").ToLocalChecked(), ctor->GetFunction());
+	exports.Set("SessionWrap", func);
+	return exports;
 }
 
-void SessionWrap::New(const Nan::FunctionCallbackInfo<v8::Value>& info) {	
-	SessionWrap *session = new SessionWrap();
-	session->Wrap(info.This());
-	info.GetReturnValue().Set(info.This());
-}
+Napi::Object SessionWrap::CreateFromContext(Napi::Env env, mbedtls_ssl_context *ssl, uint8_t *random) {
+	Napi::EscapableHandleScope scope(env);
 
-v8::Local<v8::Object> SessionWrap::CreateFromContext(mbedtls_ssl_context *ssl, uint8_t *random) {
-	Nan::EscapableHandleScope scope;
-	v8::Local<v8::Function> cons = Nan::GetFunction(Nan::New(constructor)).ToLocalChecked();
+	Napi::Value arg;
+	Napi::Object instance = constructor.New({ arg });
 
-	const unsigned argc = 0;
-	v8::Local<v8::Value> argv[argc] = {};
-	v8::Local<v8::Object> instance = Nan::NewInstance(cons, argc, argv).ToLocalChecked();
-
-	SessionWrap *news = Nan::ObjectWrap::Unwrap<SessionWrap>(instance);
+	SessionWrap *news = Napi::ObjectWrap<SessionWrap>::Unwrap(instance);
 	news->ciphersuite = ssl->session->ciphersuite;
 	memcpy(news->randbytes, random, 64);
 	memcpy(news->id, ssl->session->id, ssl->session->id_len);
@@ -52,100 +38,124 @@ v8::Local<v8::Object> SessionWrap::CreateFromContext(mbedtls_ssl_context *ssl, u
 	news->in_epoch = ssl->in_epoch;
 	memcpy(news->out_ctr, ssl->out_ctr, 8);
 
-	return scope.Escape(instance);
+	return instance;
 }
 
-void SessionWrap::Restore(const Nan::FunctionCallbackInfo<v8::Value>& info) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
+Napi::Value SessionWrap::Restore(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
 
-	v8::Local<v8::Object> object = info[0]->ToObject();
-	session->ciphersuite = Nan::Get(object, Nan::New("ciphersuite").ToLocalChecked()).ToLocalChecked()->Uint32Value();
-	
-  v8::Local<v8::Object> rbv = Nan::Get(object, Nan::New("randbytes").ToLocalChecked()).ToLocalChecked()->ToObject();
-	memcpy(session->randbytes, Buffer::Data(rbv), Buffer::Length(rbv));
-	
-  v8::Local<v8::Object> idv = Nan::Get(object, Nan::New("id").ToLocalChecked()).ToLocalChecked()->ToObject();
-	memcpy(session->id, Buffer::Data(idv), Buffer::Length(idv));
-	session->id_len = Buffer::Length(idv);
-	
-  v8::Local<v8::Object> masterv = Nan::Get(object, Nan::New("master").ToLocalChecked()).ToLocalChecked()->ToObject();
-	memcpy(session->master, Buffer::Data(masterv), Buffer::Length(masterv));
-	
-	session->in_epoch = Nan::Get(object, Nan::New("in_epoch").ToLocalChecked()).ToLocalChecked()->Uint32Value();
-  
-  v8::Local<v8::Object> out_ctrv = Nan::Get(object, Nan::New("out_ctr").ToLocalChecked()).ToLocalChecked()->ToObject();
-	memcpy(session->out_ctr, Buffer::Data(out_ctrv), Buffer::Length(out_ctrv));
+	Napi::Object object = info[0].ToObject();
+	session->ciphersuite = object.Get("ciphersuite").As<Napi::Number>().Uint32Value();
+
+	Napi::Object rbv = object.Get("randbytes").ToObject();
+	memcpy(session->randbytes,
+		(rbv).As<Napi::Buffer<char>>().Data(),
+		(rbv).As<Napi::Buffer<char>>().Length());
+
+	Napi::Object idv = object.Get("id").ToObject();
+	memcpy(session->id,
+		idv.As<Napi::Buffer<char>>().Data(),
+		idv.As<Napi::Buffer<char>>().Length());
+	session->id_len = (idv).As<Napi::Buffer<char>>().Length();
+
+	Napi::Object masterv = object.Get("master").ToObject();
+	memcpy(session->master,
+		masterv.As<Napi::Buffer<char>>().Data(),
+		masterv.As<Napi::Buffer<char>>().Length());
+
+	session->in_epoch = object.Get("in_epoch").As<Napi::Number>().Uint32Value();
+
+	Napi::Object out_ctrv = object.Get("out_ctr").ToObject();
+	memcpy(session->out_ctr,
+		out_ctrv.As<Napi::Buffer<char>>().Data(),
+		out_ctrv.As<Napi::Buffer<char>>().Length());
+
+	return Napi::Boolean::New(env, true);
 }
 
-NAN_GETTER(SessionWrap::GetCiphersuite) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
-	info.GetReturnValue().Set(Nan::New(session->ciphersuite));
+Napi::Value SessionWrap::GetCiphersuite(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
+	return Napi::Number::New(env, session->ciphersuite);
 }
 
-NAN_SETTER(SessionWrap::SetCiphersuite) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
-	session->ciphersuite = value->Uint32Value();
-}
-
-
-NAN_GETTER(SessionWrap::GetRandomBytes) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
-	info.GetReturnValue().Set(Nan::CopyBuffer((char *)session->randbytes, 64).ToLocalChecked());
-}
-
-NAN_SETTER(SessionWrap::SetRandomBytes) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
-	memcpy(session->randbytes, Buffer::Data(value), Buffer::Length(value));
-}
-
-
-NAN_GETTER(SessionWrap::GetId) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
-	info.GetReturnValue().Set(Nan::CopyBuffer((char *)session->id, session->id_len).ToLocalChecked());
-}
-
-NAN_SETTER(SessionWrap::SetId) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
-	memcpy(session->id, Buffer::Data(value), Buffer::Length(value));
-	session->id_len = Buffer::Length(value);
+void SessionWrap::SetCiphersuite(const Napi::CallbackInfo& info, const Napi::Value& value) {
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
+	session->ciphersuite = value.As<Napi::Number>().Uint32Value();
 }
 
 
-NAN_GETTER(SessionWrap::GetMaster) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
-	info.GetReturnValue().Set(Nan::CopyBuffer((char *)session->master, 48).ToLocalChecked());
+Napi::Value SessionWrap::GetRandomBytes(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
+	return Napi::Buffer<char>::Copy(env, (char *)session->randbytes, 64);
 }
 
-NAN_SETTER(SessionWrap::SetMaster) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
-	memcpy(session->master, Buffer::Data(value), Buffer::Length(value));
-}
-
-
-NAN_GETTER(SessionWrap::GetInEpoch) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
-	info.GetReturnValue().Set(Nan::New(session->in_epoch));
-}
-
-NAN_SETTER(SessionWrap::SetInEpoch) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
-	session->in_epoch = value->Uint32Value();
+void SessionWrap::SetRandomBytes(const Napi::CallbackInfo& info, const Napi::Value& value) {
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
+	memcpy(session->randbytes,
+		value.As<Napi::Buffer<unsigned char>>().Data(),
+		value.As<Napi::Buffer<unsigned char>>().Length());
 }
 
 
-NAN_GETTER(SessionWrap::GetOutCounter) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
-	info.GetReturnValue().Set(Nan::CopyBuffer((char *)session->out_ctr, 8).ToLocalChecked());
+Napi::Value SessionWrap::GetId(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
+	return Napi::Buffer<char>::Copy(env, (char *)session->id, session->id_len);
 }
 
-NAN_SETTER(SessionWrap::SetOutCounter) {
-	SessionWrap *session = Nan::ObjectWrap::Unwrap<SessionWrap>(info.This());
-	memcpy(session->out_ctr, Buffer::Data(value), Buffer::Length(value));
+void SessionWrap::SetId(const Napi::CallbackInfo& info, const Napi::Value& value) {
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
+	memcpy(session->id,
+		value.As<Napi::Buffer<unsigned char>>().Data(),
+		value.As<Napi::Buffer<unsigned char>>().Length());
+	session->id_len = value.As<Napi::Buffer<unsigned char>>().Length();
 }
 
-SessionWrap::SessionWrap() {
+
+Napi::Value SessionWrap::GetMaster(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
+	return Napi::Buffer<char>::Copy(env, (char *)session->master, 48);
+}
+
+void SessionWrap::SetMaster(const Napi::CallbackInfo& info, const Napi::Value& value) {
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
+	memcpy(session->master,
+		value.As<Napi::Buffer<unsigned char>>().Data(),
+		value.As<Napi::Buffer<unsigned char>>().Length());
+}
+
+
+Napi::Value SessionWrap::GetInEpoch(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
+	return Napi::Number::New(env, session->in_epoch);
+}
+
+void SessionWrap::SetInEpoch(const Napi::CallbackInfo& info, const Napi::Value& value) {
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
+	session->in_epoch = value.As<Napi::Number>().Uint32Value();
+}
+
+
+Napi::Value SessionWrap::GetOutCounter(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
+	return Napi::Buffer<char>::Copy(env, (char *)session->out_ctr, 8);
+}
+
+void SessionWrap::SetOutCounter(const Napi::CallbackInfo& info, const Napi::Value& value) {
+	SessionWrap *session = Napi::ObjectWrap<SessionWrap>::Unwrap(info.This().As<Napi::Object>());
+	memcpy(session->out_ctr,
+		value.As<Napi::Buffer<unsigned char>>().Data(),
+		value.As<Napi::Buffer<unsigned char>>().Length());
+}
+
+SessionWrap::SessionWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<SessionWrap>(info) {
 }
 
 SessionWrap::~SessionWrap() {
-
 }
