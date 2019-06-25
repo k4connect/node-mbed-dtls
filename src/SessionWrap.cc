@@ -36,7 +36,7 @@ Napi::Object SessionWrap::CreateFromContext(Napi::Env env, mbedtls_ssl_context *
 	news->in_epoch = ssl->in_epoch;
 	memcpy(news->out_ctr, ssl->out_ctr, 8);
 
-	return instance;
+	return scope.Escape(instance).As<Napi::Object>();
 }
 
 Napi::Value SessionWrap::Restore(const Napi::CallbackInfo& info) {
