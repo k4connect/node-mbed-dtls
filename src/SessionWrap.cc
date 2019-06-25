@@ -47,27 +47,34 @@ Napi::Value SessionWrap::Restore(const Napi::CallbackInfo& info) {
 	session->ciphersuite = object.Get("ciphersuite").As<Napi::Number>().Uint32Value();
 
 	Napi::Object rbv = object.Get("randbytes").ToObject();
-	memcpy(session->randbytes,
-		(rbv).As<Napi::Buffer<char>>().Data(),
-		(rbv).As<Napi::Buffer<char>>().Length());
+	size_t rbv_length = rbv.As<Napi::Buffer<char>>().Length();
+	if (rbv_length > RANDBYTES_LENGTH) {
+		throw Napi::RangeError::New(env, "random bytes value length greater than allowed");
+	}
+	memcpy(session->randbytes, (rbv).As<Napi::Buffer<char>>().Data(), rbv_length);
 
 	Napi::Object idv = object.Get("id").ToObject();
-	memcpy(session->id,
-		idv.As<Napi::Buffer<char>>().Data(),
-		idv.As<Napi::Buffer<char>>().Length());
-	session->id_len = (idv).As<Napi::Buffer<char>>().Length();
+	size_t idv_length = idv.As<Napi::Buffer<char>>().Length();
+	if (idv_length > ID_LENGTH) {
+		throw Napi::RangeError::New(env, "id value length greater than allowed");
+	}
+	memcpy(session->id, idv.As<Napi::Buffer<char>>().Data(), idv_length);
+	session->id_len = idv_length;
 
 	Napi::Object masterv = object.Get("master").ToObject();
-	memcpy(session->master,
-		masterv.As<Napi::Buffer<char>>().Data(),
-		masterv.As<Napi::Buffer<char>>().Length());
-
+	size_t masterv_length = rbv.As<Napi::Buffer<char>>().Length();
+	if (masterv_length > MASTER_LENGTH) {
+		throw Napi::RangeError::New(env, "master value length greater than allowed");
+	}
+	memcpy(session->master, masterv.As<Napi::Buffer<char>>().Data(), masterv_length);
 	session->in_epoch = object.Get("in_epoch").As<Napi::Number>().Uint32Value();
 
 	Napi::Object out_ctrv = object.Get("out_ctr").ToObject();
-	memcpy(session->out_ctr,
-		out_ctrv.As<Napi::Buffer<char>>().Data(),
-		out_ctrv.As<Napi::Buffer<char>>().Length());
+	size_t out_ctrv_length = rbv.As<Napi::Buffer<char>>().Length();
+	if (out_ctrv_length > OUT_CR_LENGTH) {
+		throw Napi::RangeError::New(env, "out_ctr value length greater than allowed");
+	}
+	memcpy(session->out_ctr, out_ctrv.As<Napi::Buffer<char>>().Data(), out_ctrv_length);
 
 	return Napi::Boolean::New(env, true);
 }
