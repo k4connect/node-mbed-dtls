@@ -29,12 +29,12 @@ Napi::Object SessionWrap::CreateFromContext(Napi::Env env, mbedtls_ssl_context *
 
 	SessionWrap *news = Napi::ObjectWrap<SessionWrap>::Unwrap(instance);
 	news->ciphersuite = ssl->session->ciphersuite;
-	memcpy(news->randbytes, random, 64);
+	memcpy(news->randbytes, random, RANDBYTES_LENGTH);
 	memcpy(news->id, ssl->session->id, ssl->session->id_len);
 	news->id_len = ssl->session->id_len;
-	memcpy(news->master, ssl->session->master, 48);
+	memcpy(news->master, ssl->session->master, MASTER_LENGTH);
 	news->in_epoch = ssl->in_epoch;
-	memcpy(news->out_ctr, ssl->out_ctr, 8);
+	memcpy(news->out_ctr, ssl->out_ctr, OUT_CR_LENGTH);
 
 	return scope.Escape(instance).As<Napi::Object>();
 }

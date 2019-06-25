@@ -5,9 +5,14 @@
 
 #include "mbedtls/ssl.h"
 
+#define ID_LENGTH 32
+#define MASTER_LENGTH 48
+#define RANDBYTES_LENGTH 64
+#define OUT_CR_LENGTH 8
+
 class SessionWrap : public Napi::ObjectWrap<SessionWrap> {
 public:
-	static Napi::Object Initialize(Napi::Env& env, Napi::Object& exports);	
+	static Napi::Object Initialize(Napi::Env& env, Napi::Object& exports);
 	static Napi::Object CreateFromContext(Napi::Env env, mbedtls_ssl_context *ssl, uint8_t *random);
 	Napi::Value Restore(const Napi::CallbackInfo& info);
 	Napi::Value GetCiphersuite(const Napi::CallbackInfo& info);
@@ -27,13 +32,13 @@ public:
 	~SessionWrap();
 
 	int ciphersuite;
-	unsigned char id[32];
+	unsigned char id[ID_LENGTH];
 	size_t id_len;
-	unsigned char master[48];
-	uint8_t randbytes[64];
+	unsigned char master[MASTER_LENGTH];
+	uint8_t randbytes[RANDBYTES_LENGTH];
 	uint16_t in_epoch;
-	unsigned char out_ctr[8];
-	
+	unsigned char out_ctr[OUT_CR_LENGTH];
+
 private:
 	static Napi::FunctionReference constructor;
 };
