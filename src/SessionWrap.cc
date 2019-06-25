@@ -25,9 +25,7 @@ Napi::Object SessionWrap::Initialize(Napi::Env& env, Napi::Object& exports) {
 
 Napi::Object SessionWrap::CreateFromContext(Napi::Env env, mbedtls_ssl_context *ssl, uint8_t *random) {
 	Napi::EscapableHandleScope scope(env);
-
-	Napi::Value arg;
-	Napi::Object instance = constructor.New({ arg });
+	Napi::Object instance = constructor.New({ });
 
 	SessionWrap *news = Napi::ObjectWrap<SessionWrap>::Unwrap(instance);
 	news->ciphersuite = ssl->session->ciphersuite;
