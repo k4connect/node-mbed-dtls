@@ -24,7 +24,6 @@ public:
 	~DtlsServer();
 private:
 	static Napi::FunctionReference constructor;
-	uint32_t handshake_timeout_min;
 	mbedtls_ssl_cookie_ctx cookie_ctx;
 	mbedtls_entropy_context entropy;
 	mbedtls_ctr_drbg_context ctr_drbg;

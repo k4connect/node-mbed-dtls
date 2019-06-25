@@ -114,12 +114,12 @@ DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsSe
 
 Napi::Value DtlsServer::GetHandshakeTimeoutMin(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
-	return Napi::Number::New(env, this->handshake_timeout_min);
+	return Napi::Number::New(env, this->config()->hs_timeout_min);
 }
 
 void DtlsServer::SetHandshakeTimeoutMin(const Napi::CallbackInfo& info, const Napi::Value& value) {
-	this->handshake_timeout_min = value.As<Napi::Number>().Uint32Value();
-	mbedtls_ssl_conf_handshake_timeout(this->config(), this->handshake_timeout_min, this->config()->hs_timeout_max);
+	uint32_t hs_timeout_min = value.As<Napi::Number>().Uint32Value();
+	mbedtls_ssl_conf_handshake_timeout(this->config(), hs_timeout_min, this->config()->hs_timeout_max);
 }
 
 DtlsServer::~DtlsServer() {
