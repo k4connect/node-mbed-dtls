@@ -16,6 +16,16 @@
 #include "mbedtls/ssl_cache.h"
 #endif
 
+#define CHECK_MBEDTLS(_expr) \
+	do { \
+		const int _r = _expr; \
+		if (_r != 0) { \
+			throwMbedTlsError(env, _r); \
+		} \
+	} while (false)
+
+void throwMbedTlsError(Napi::Env& env, int error);
+
 class DtlsServer : public Napi::ObjectWrap<DtlsServer> {
 public:
 	static Napi::Object Initialize(Napi::Env env, Napi::Object exports);

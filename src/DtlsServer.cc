@@ -6,6 +6,12 @@
 #define mbedtls_printf     printf
 #define mbedtls_fprintf    fprintf
 
+void throwMbedTlsError(Napi::Env& env, int error) {
+	char buf[256] = {};
+	mbedtls_strerror(error, buf, sizeof(buf));
+	throw Napi::Error::New(env, buf);
+}
+
 static void my_debug( void *ctx, int level,
 											const char *file, int line,
 											const char *str )
@@ -55,7 +61,6 @@ DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsSe
 		debug_level = info[1].ToNumber().Uint32Value();
 	}
 
-	int ret;
 	const char *pers = "dtls_server";
 	mbedtls_ssl_config_init(&conf);
 	mbedtls_ssl_cookie_init(&cookie_ctx);
@@ -71,45 +76,27 @@ DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsSe
 	mbedtls_debug_set_threshold(debug_level);
 #endif
 
-	try {
-		ret = mbedtls_pk_parse_key(&pkey, key, key_len, NULL, 0);
-		if (ret) throw ret;
+	CHECK_MBEDTLS(mbedtls_pk_parse_key(&pkey, key, key_len, NULL, 0));
+	CHECK_MBEDTLS(mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers)));
+	CHECK_MBEDTLS(mbedtls_ssl_config_defaults(&conf, MBEDTLS_SSL_IS_SERVER, MBEDTLS_SSL_TRANSPORT_DATAGRAM, MBEDTLS_SSL_PRESET_DEFAULT));
 
-		// TODO re-use node entropy and randomness
-		ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers));
-		if (ret) throw ret;
+	mbedtls_ssl_conf_min_version(&conf, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_3);
 
-		ret = mbedtls_ssl_config_defaults(&conf, MBEDTLS_SSL_IS_SERVER, MBEDTLS_SSL_TRANSPORT_DATAGRAM, MBEDTLS_SSL_PRESET_DEFAULT);
-		if (ret) throw ret;
+	mbedtls_ssl_conf_rng(&conf, mbedtls_ctr_drbg_random, &ctr_drbg);
+	mbedtls_ssl_conf_dbg(&conf, my_debug, stdout);
 
-		mbedtls_ssl_conf_min_version(&conf, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_3);
+	CHECK_MBEDTLS(mbedtls_ssl_conf_own_cert(&conf, &srvcert, &pkey));
+	CHECK_MBEDTLS(mbedtls_ssl_cookie_setup(&cookie_ctx, mbedtls_ctr_drbg_random, &ctr_drbg));
 
-		// TODO use node random number generator?
-		mbedtls_ssl_conf_rng(&conf, mbedtls_ctr_drbg_random, &ctr_drbg);
-		mbedtls_ssl_conf_dbg(&conf, my_debug, stdout);
+	mbedtls_ssl_conf_dtls_cookies(&conf, mbedtls_ssl_cookie_write, mbedtls_ssl_cookie_check, &cookie_ctx);
+	mbedtls_ssl_conf_authmode(&conf, MBEDTLS_SSL_VERIFY_OPTIONAL);
 
-		ret = mbedtls_ssl_conf_own_cert(&conf, &srvcert, &pkey);
-		if (ret) throw ret;
+	static int ssl_cert_types[] = { MBEDTLS_TLS_CERT_TYPE_RAW_PUBLIC_KEY, MBEDTLS_TLS_CERT_TYPE_NONE };
+	mbedtls_ssl_conf_client_certificate_types(&conf, ssl_cert_types);
+	mbedtls_ssl_conf_server_certificate_types(&conf, ssl_cert_types);
 
-		ret = mbedtls_ssl_cookie_setup(&cookie_ctx, mbedtls_ctr_drbg_random, &ctr_drbg);
-		if (ret) throw ret;
-
-		mbedtls_ssl_conf_dtls_cookies(&conf, mbedtls_ssl_cookie_write, mbedtls_ssl_cookie_check, &cookie_ctx);
-
-		// needed for server to send CertificateRequest
-		mbedtls_ssl_conf_authmode(&conf, MBEDTLS_SSL_VERIFY_OPTIONAL);
-
-		static int ssl_cert_types[] = { MBEDTLS_TLS_CERT_TYPE_RAW_PUBLIC_KEY, MBEDTLS_TLS_CERT_TYPE_NONE };
-		mbedtls_ssl_conf_client_certificate_types(&conf, ssl_cert_types);
-		mbedtls_ssl_conf_server_certificate_types(&conf, ssl_cert_types);
-
-		// turn off server sending Certificate
-		mbedtls_ssl_conf_certificate_send(&conf, MBEDTLS_SSL_SEND_CERTIFICATE_DISABLED);
-	} catch (int ret) {
-		char error_buf[255];
-		mbedtls_strerror(ret, error_buf, 255);
-		Napi::Error::New(env, error_buf).ThrowAsJavaScriptException();
-	}
+	// turn off server sending Certificate
+	mbedtls_ssl_conf_certificate_send(&conf, MBEDTLS_SSL_SEND_CERTIFICATE_DISABLED);
 }
 
 Napi::Value DtlsServer::GetHandshakeTimeoutMin(const Napi::CallbackInfo& info) {
