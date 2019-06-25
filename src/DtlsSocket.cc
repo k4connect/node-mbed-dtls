@@ -39,8 +39,7 @@ Napi::Value DtlsSocket::Initialize(Napi::Env& env, Napi::Object& exports) {
 Napi::Object DtlsSocket::New(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
 	if (info.Length() < 6) {
-		Napi::TypeError::New(env, "DtlsSocket requires six arguments").ThrowAsJavaScriptException();
-		return Napi::Object::New(env);
+		throw Napi::TypeError::New(env, "DtlsSocket requires six arguments");
 	}
 
 	// TODO check arguments types
@@ -81,8 +80,7 @@ Napi::Value DtlsSocket::GetPublicKey(const Napi::CallbackInfo& info) {
 
 	mbedtls_ssl_session *session = socket->ssl_context.session;
 	if (session == NULL) {
-		Napi::TypeError::New(env, "ssl_context.session was null").ThrowAsJavaScriptException();
-		return Napi::Object::New(env);
+		throw Napi::TypeError::New(env, "ssl_context.session was null");
 	}
 	int ret;
 	const size_t buf_len = 256;
@@ -90,8 +88,7 @@ Napi::Value DtlsSocket::GetPublicKey(const Napi::CallbackInfo& info) {
 	mbedtls_pk_context pk = session->peer_cert->pk;
 	ret = mbedtls_pk_write_pubkey_der(&pk, buf, buf_len);
 	if (ret < 0) {
-		Napi::TypeError::New(env, "error in mbedtls_pk_write_pubkey_der").ThrowAsJavaScriptException();
-		return Napi::Object::New(env);
+		throw Napi::TypeError::New(env, "error in mbedtls_pk_write_pubkey_der");
 	}
 
 	// key is written at the end
@@ -105,8 +102,7 @@ Napi::Value DtlsSocket::GetPublicKeyPEM(const Napi::CallbackInfo& info) {
 	mbedtls_ssl_session *session = socket->ssl_context.session;
 	if (session == NULL ||
 		session->peer_cert == NULL) {
-		Napi::TypeError::New(env, "ssl_context.session was null").ThrowAsJavaScriptException();
-		return Napi::Object::New(env);
+		throw Napi::TypeError::New(env, "ssl_context.session was null");
 	}
 
 	int ret;
@@ -160,8 +156,7 @@ Napi::Value DtlsSocket::ResumeSession(const Napi::CallbackInfo& info) {
 
 	Napi::Object sessWrap = info[0].As<Napi::Object>();
 	if (sessWrap.IsEmpty()) {
-		Napi::TypeError::New(env, "ResumeSession requires one argument, was null").ThrowAsJavaScriptException();
-		return Napi::Object::New(env);
+		throw Napi::TypeError::New(env, "ResumeSession requires one argument, was null");
 	}
 
 	SessionWrap *sess = Napi::ObjectWrap<SessionWrap>::Unwrap(sessWrap);
@@ -444,7 +439,7 @@ int DtlsSocket::step() {
 void DtlsSocket::throwError(int ret) {
 	char error_buf[100];
 	mbedtls_strerror(ret, error_buf, 100);
-	Napi::Error::New(env, error_buf).ThrowAsJavaScriptException();
+	throw Napi::Error::New(env, error_buf);
 }
 
 void DtlsSocket::error(int ret) {
