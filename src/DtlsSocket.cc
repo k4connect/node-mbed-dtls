@@ -72,7 +72,7 @@ Napi::Value DtlsSocket::ReceiveDataFromNode(const Napi::CallbackInfo& info) {
 	unsigned char buf[len];
 	len = socket->receive_data(buf, len);
 
-	return len > 0 ? Napi::Buffer<unsigned char>::Copy(env, buf, len) : Napi::Object::New(env);
+	return len > 0 ? Napi::Buffer<unsigned char>::Copy(env, buf, len) : env.Undefined();
 }
 
 Napi::Value DtlsSocket::GetPublicKey(const Napi::CallbackInfo& info) {
