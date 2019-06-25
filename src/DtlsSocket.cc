@@ -82,17 +82,17 @@ Napi::Value DtlsSocket::GetPublicKey(const Napi::CallbackInfo& info) {
 	if (session == NULL) {
 		throw Napi::TypeError::New(env, "ssl_context.session was null");
 	}
-	int ret;
-	const size_t buf_len = 256;
-	unsigned char buf[buf_len];
+
+	unsigned char buf[KEYBUFF_LENGTH];
 	mbedtls_pk_context pk = session->peer_cert->pk;
-	ret = mbedtls_pk_write_pubkey_der(&pk, buf, buf_len);
+	int ret = mbedtls_pk_write_pubkey_der(&pk, buf, KEYBUFF_LENGTH);
+
 	if (ret < 0) {
-		throw Napi::TypeError::New(env, "error in mbedtls_pk_write_pubkey_der");
+		throw Napi::TypeError::New(env, "error at mbedtls_pk_write_pubkey_der");
 	}
 
 	// key is written at the end
-	return Napi::Buffer<char>::Copy(env, (char *)buf + (buf_len - ret), ret);
+	return Napi::Buffer<char>::Copy(env, (char *)buf + (KEYBUFF_LENGTH - ret), ret);
 }
 
 Napi::Value DtlsSocket::GetPublicKeyPEM(const Napi::CallbackInfo& info) {
@@ -105,17 +105,15 @@ Napi::Value DtlsSocket::GetPublicKeyPEM(const Napi::CallbackInfo& info) {
 		throw Napi::TypeError::New(env, "ssl_context.session was null");
 	}
 
-	int ret;
-	const size_t buf_len = 256;
-	unsigned char buf[buf_len];
+	unsigned char buf[KEYBUFF_LENGTH];
 	mbedtls_pk_context pk = session->peer_cert->pk;
-	ret = mbedtls_pk_write_pubkey_pem(&pk, buf, buf_len);
+	int ret = mbedtls_pk_write_pubkey_pem(&pk, buf, KEYBUFF_LENGTH);
+
 	if (ret < 0) {
-		const char * message =  "error at mbedtls_pk_write_pubkey_pem";
-		return Napi::Buffer<const char>::Copy(env, message, strlen(message));
+		throw Napi::TypeError::New(env, "error at mbedtls_pk_write_pubkey_pem");
 	}
 
-	return Napi::Buffer<const char>::Copy(env, (char *)buf, strlen((const char *)buf));
+	return Napi::Buffer<char>::Copy(env, (char *)buf, strlen((char *)buf));
 }
 
 Napi::Value DtlsSocket::GetOutCounter(const Napi::CallbackInfo& info) {
