@@ -15,7 +15,7 @@ Napi::Value DtlsSocket::Initialize(Napi::Env& env, Napi::Object& exports) {
 	Napi::HandleScope scope(env);
 
 	// Constructor
-	Napi::Function func = DefineClass(env, "SessionWrap", {
+	Napi::Function func = DefineClass(env, "DtlsSocket", {
 		InstanceMethod("receiveData", &DtlsSocket::ReceiveDataFromNode),
 		InstanceMethod("close", &DtlsSocket::Close),
 		InstanceMethod("send", &DtlsSocket::Send),
