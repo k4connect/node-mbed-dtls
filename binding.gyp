@@ -164,7 +164,6 @@
         "mbedcrypto"
       ],
       "defines": [
-        "NAPI_DISABLE_CPP_EXCEPTIONS",
         "MBEDTLS_CONFIG_FILE=\"config-ecc-ccm-rpk-dtls1_2.h\""
       ]
     }
