@@ -39,7 +39,7 @@ class DtlsServer extends EventEmitter {
 		// likely a PEM encoded key, add null terminating byte
 		// 0x2d = '-'
 		if (key[0] === 0x2d && key[key.length - 1] !== 0) {
-			key = Buffer.concat([key, new Buffer([0])]);
+			key = Buffer.concat([key, Buffer.from([0])]);
 		}
 
 		this.mbedServer = new mbed.DtlsServer(key, options.debug);
@@ -148,7 +148,7 @@ class DtlsServer extends EventEmitter {
 		this._debug(`Attempting force re-handshake by sending malformed hello request packet to deviceID=${deviceId}`);
 		
 		// Construct the 'session killing' Avada Kedavra packet
-		const malformedHelloRequest = new Buffer([
+		const malformedHelloRequest = Buffer.from([
 			0x16,                                 // Handshake message type 22
 			0xfe, 0xfd,                           // DTLS 1.2
 			0x00, 0x01,                           // Epoch
