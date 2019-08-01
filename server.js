@@ -137,8 +137,10 @@ class DtlsServer extends EventEmitter {
 				// https://app.clubhouse.io/particle/milestone/32301/manage-next-steps-associated-with-device-connectivity-issues-starting-may-2nd-2019
 				// This cloud-side solution was discovered by Eli Thomas which caused
 				// mbedTLS to fail a socket read and initiate a handshake.
-				this._debug(`handleIpChange: deviceId key doesnt exist in redis or there was a redis error deviceID=${deviceId}`);
-				this.emit('forceDeviceRehandshake', rinfo, deviceId); 
+				this._debug(`Device in 'move session' lock state attempting to force it to re-handshake deviceID=${deviceId}`);
+
+				//Always EMIT this event instead of calling _forceDeviceRehandshake internally this allows the DS to device wether to send the packet or not to the device
+				this.emit('forceDeviceRehandshake', rinfo, deviceId);
 			}
 		});
 		return lookedUp;
@@ -157,7 +159,7 @@ class DtlsServer extends EventEmitter {
 			0x00,                                 // HandshakeType hello_request
 			0x00                                  // Handshake body, intentionally too short at a single byte
 		]);
-		
+
 		// Sending the malformed hello request back over the raw UDP socket
 		this.dgramSocket.send(malformedHelloRequest, rinfo.port, rinfo.address);
 	}
