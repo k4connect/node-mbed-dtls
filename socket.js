@@ -2,7 +2,7 @@
 
 const stream = require('stream');
 
-const mbed = require('./build/Release/node_mbed_dtls');
+var mbed = require('bindings')('node_mbed_dtls.node');
 
 const MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY = -0x7880;
 const MBEDTLS_ERR_SSL_CLIENT_RECONNECT = -0x6780;
