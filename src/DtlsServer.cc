@@ -54,8 +54,10 @@ DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsSe
 	}
 
 	Napi::Buffer<unsigned char> key_buffer = info[0].As<Napi::Buffer<unsigned char>>();
-	unsigned char * key = (unsigned char *) key_buffer.Data();
 	size_t key_len = key_buffer.Length();
+	unsigned char * key = (unsigned char *) malloc(key_len + 1);
+	memcpy(key, (unsigned char *) key_buffer.Data(), key_len);
+	key[key_len] = '\0';
 
 	int debug_level = 0;
 	if (info.Length() > 1) {
@@ -77,7 +79,8 @@ DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsSe
 	mbedtls_debug_set_threshold(debug_level);
 #endif
 
-	CHECK_MBEDTLS(mbedtls_pk_parse_key(&pkey, key, key_len, NULL, 0));
+	CHECK_MBEDTLS(mbedtls_pk_parse_key(&pkey, key, key_len + 1, NULL, 0));
+	free(key);
 	CHECK_MBEDTLS(mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers)));
 	CHECK_MBEDTLS(mbedtls_ssl_config_defaults(&conf, MBEDTLS_SSL_IS_SERVER, MBEDTLS_SSL_TRANSPORT_DATAGRAM, MBEDTLS_SSL_PRESET_DEFAULT));
 
