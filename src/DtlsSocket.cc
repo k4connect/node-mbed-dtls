@@ -293,11 +293,10 @@ void DtlsSocket::reset() {
 }
 
 int DtlsSocket::send_encrypted(const unsigned char *buf, size_t len) {
-	napi_value  argv[] = {
+	send_cb.Call({
 		Napi::Buffer<char>::Copy(env, (char *)buf, len)
-	};
+	});
 
-	send_cb.Call(1, argv);
 	return len;
 }
 
@@ -345,11 +344,9 @@ int DtlsSocket::receive_data(unsigned char *buf, int len) {
 void DtlsSocket::get_session_cache(mbedtls_ssl_session *session) {
 	session_wait = true;
 
-	napi_value argv[] = {
+	resume_sess_cb.Call({
 		Napi::String::New(env, (const char*) session->id, session->id_len)
-	};
-
-	resume_sess_cb.Call(1, argv);
+	});
 }
 
 void DtlsSocket::renegotiate(SessionWrap *sess) {
@@ -432,8 +429,7 @@ int DtlsSocket::step() {
 	}
 
 	// this should only be called once when we first finish the handshake
-	napi_value argv[] = {};
-	handshake_cb.Call(0, argv);
+	handshake_cb.Call({});
 	return 0;
 }
 
@@ -446,12 +442,11 @@ void DtlsSocket::throwError(int ret) {
 void DtlsSocket::error(int ret) {
 	char error_buf[100];
 	mbedtls_strerror(ret, error_buf, 100);
-	napi_value argv[] = {
+
+	error_cb.Call({
 		Napi::Number::New(env, ret),
 		Napi::String::New(env, error_buf)
-	};
-
-	error_cb.Call(2, argv);
+	});
 }
 
 void DtlsSocket::store_data(const unsigned char *buf, size_t len) {
