@@ -4,8 +4,8 @@
   "description": "Node mbed DTLS",
   "main": "index.js",
   "scripts": {
-    "build": "node-gyp rebuild",
-    "debug": "node-gyp rebuild --debug",
+    "build": "node-gyp rebuild -j 8",
+    "debug": "node-gyp rebuild -j 8 --debug",
     "clean": "node-gyp clean",
     "install": "node-gyp rebuild",
     "test": "mocha test/server.js"
