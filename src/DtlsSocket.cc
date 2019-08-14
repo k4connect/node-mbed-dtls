@@ -58,6 +58,8 @@ Napi::Object DtlsSocket::New(const Napi::CallbackInfo& info) {
 
 Napi::Value DtlsSocket::ReceiveDataFromNode(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
+	Napi::HandleScope scope(env);
+
 	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
 
 	if (info.Length() >= 1 && info[0].IsBuffer()) {

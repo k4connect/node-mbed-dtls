@@ -45,6 +45,7 @@ Napi::Object DtlsServer::Initialize(Napi::Env env, Napi::Object exports) {
 
 DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsServer>(info) {
 	Napi::Env env = info.Env();
+	Napi::HandleScope scope(env);
 
 	// Required 1st param: key
 	if (info.Length() < 1 || !info[0].IsBuffer()) {

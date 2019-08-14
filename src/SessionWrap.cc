@@ -160,6 +160,8 @@ void SessionWrap::SetOutCounter(const Napi::CallbackInfo& info, const Napi::Valu
 }
 
 SessionWrap::SessionWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<SessionWrap>(info) {
+	Napi::Env env = info.Env();
+	Napi::HandleScope scope(env);
 }
 
 SessionWrap::~SessionWrap() {
