@@ -47,10 +47,10 @@ private:
 	Napi::Env env;
 	static Napi::FunctionReference constructor;
 	void throwError(int ret);
-	Napi::Function send_cb;
-	Napi::Function error_cb;
-	Napi::Function handshake_cb;
-	Napi::Function resume_sess_cb;
+	Napi::FunctionReference send_cb;
+	Napi::FunctionReference error_cb;
+	Napi::FunctionReference handshake_cb;
+	Napi::FunctionReference resume_sess_cb;
 	mbedtls_ssl_context ssl_context;
 	mbedtls_timing_delay_context timer;
 	mbedtls_ssl_config* ssl_config;

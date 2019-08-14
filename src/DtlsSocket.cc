@@ -194,10 +194,11 @@ DtlsSocket::DtlsSocket(const Napi::CallbackInfo& info) :
 		env(info.Env()) {
 	DtlsServer *server = Napi::ObjectWrap<DtlsServer>::Unwrap(info[0].As<Napi::Object>());
 	std::string client_ip = (std::string) info[1].As<Napi::String>();
-	send_cb = info[2].As<Napi::Function>();
-	error_cb = info[3].As<Napi::Function>();
-	handshake_cb = info[4].As<Napi::Function>();
-	resume_sess_cb = info[5].As<Napi::Function>();
+
+	send_cb = Napi::Persistent(info[2].As<Napi::Function>());
+	error_cb = Napi::Persistent(info[3].As<Napi::Function>());
+	handshake_cb = Napi::Persistent(info[4].As<Napi::Function>());
+	resume_sess_cb = Napi::Persistent(info[5].As<Napi::Function>());
 	session_wait = false;
 	int ret;
 
