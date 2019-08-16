@@ -38,6 +38,8 @@ Napi::Value DtlsSocket::Initialize(Napi::Env& env, Napi::Object& exports) {
 
 Napi::Object DtlsSocket::New(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
+	Napi::EscapableHandleScope scope(env);
+
 	if (info.Length() < 6) {
 		throw Napi::TypeError::New(env, "DtlsSocket requires six arguments");
 	}
@@ -53,7 +55,7 @@ Napi::Object DtlsSocket::New(const Napi::CallbackInfo& info) {
 
 	Napi::Object obj = constructor.New({ server, client_ip, send_cb, hs_cb, error_cb, resume_cb });
 
-	return obj;
+	return scope.Escape(napi_value(obj)).ToObject();
 }
 
 Napi::Value DtlsSocket::ReceiveDataFromNode(const Napi::CallbackInfo& info) {
