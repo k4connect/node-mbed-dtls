@@ -426,6 +426,7 @@ int DtlsSocket::step() {
 			return 0;
 		} else if (ret != 0) {
 			// bad things
+			mbedtls_ssl_session_reset(&ssl_context);
 			error(ret);
 			return 0;
 		}
