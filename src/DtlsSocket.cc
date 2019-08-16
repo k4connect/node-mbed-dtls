@@ -438,14 +438,14 @@ int DtlsSocket::step() {
 }
 
 void DtlsSocket::throwError(int ret) {
-	char error_buf[100];
-	mbedtls_strerror(ret, error_buf, 100);
+	char error_buf[255];
+	mbedtls_strerror(ret, error_buf, 254);
 	throw Napi::Error::New(env, error_buf);
 }
 
 void DtlsSocket::error(int ret) {
 	char error_buf[255];
-	mbedtls_strerror(ret, error_buf, 255);
+	mbedtls_strerror(ret, error_buf, 254);
 
 	error_cb.Call({
 		Napi::Number::New(env, ret),
