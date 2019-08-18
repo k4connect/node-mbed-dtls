@@ -198,6 +198,8 @@ DtlsSocket::DtlsSocket(const Napi::CallbackInfo& info) :
 	handshake_cb = Napi::Persistent(info[4].As<Napi::Function>());
 	resume_sess_cb = Napi::Persistent(info[5].As<Napi::Function>());
 	session_wait = false;
+	recv_buf = nullptr;
+	recv_len = 0;
 	int ret;
 
 	if((ip = (unsigned char *)calloc(1, client_ip.length())) == NULL) {
@@ -302,7 +304,6 @@ int DtlsSocket::recv(unsigned char *buf, size_t len) {
 	if (recv_len != 0) {
 		len = recv_len;
 		memcpy(buf, recv_buf, recv_len);
-		recv_buf = NULL;
 		recv_len = 0;
 		return len;
 	}
@@ -449,7 +450,13 @@ void DtlsSocket::error(int ret) {
 }
 
 void DtlsSocket::store_data(const unsigned char *buf, size_t len) {
-	recv_buf = buf;
+	if (recv_buf == nullptr) {
+		recv_buf = (unsigned char *) malloc(len);
+	} else if (recv_len < len) {
+		recv_buf = (unsigned char *) realloc(recv_buf, len);
+	}
+
+	memcpy(recv_buf, buf, len);
 	recv_len = len;
 }
 
@@ -466,6 +473,10 @@ DtlsSocket::~DtlsSocket() {
 		ip = nullptr;
 	}
 
-	recv_buf = nullptr;
+	if (recv_buf != nullptr) {
+		free(recv_buf);
+		recv_buf = nullptr;
+	}
+
 	mbedtls_ssl_free(&ssl_context);
 }
