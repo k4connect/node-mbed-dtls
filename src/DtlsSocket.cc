@@ -62,33 +62,36 @@ Napi::Value DtlsSocket::ReceiveDataFromNode(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
 	Napi::HandleScope scope(env);
 
-	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
-
 	if (info.Length() >= 1 && info[0].IsBuffer()) {
 		Napi::Buffer<unsigned char> recv_buffer = info[0].As<Napi::Buffer<unsigned char>>();
 		const unsigned char *recv_data = (unsigned char *) recv_buffer.Data();
 		size_t recv_len = recv_buffer.Length();
-		fprintf(stdout, "-------\n%d\n%x\n-------\n", recv_len, recv_data);
-		socket->store_data(recv_data, recv_len);
+		store_data(recv_data, recv_len);
 	}
 
 	unsigned char buf[RECV_BUF_LENGTH];
-	unsigned int len = socket->receive_data(buf, RECV_BUF_LENGTH);
+	memset(buf, 0, RECV_BUF_LENGTH); // just to see what is going on in the debug prints
+	unsigned int len = receive_data(buf, RECV_BUF_LENGTH);
+	dump_char_data("Recv", buf, RECV_BUF_LENGTH);
+
+	if (len > 0) {
+		printf("--- SET RESULT TO BUFFER COPY WITH LEN=%d\n", len);
+	} else {
+		printf("--- SET RESULT TO UNDEFINED\n");
+	}
 
 	return len > 0 ? Napi::Buffer<unsigned char>::Copy(env, buf, len) : env.Undefined();
 }
 
 Napi::Value DtlsSocket::GetPublicKey(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
-	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
 
-	mbedtls_ssl_session *session = socket->ssl_context.session;
-	if (session == NULL) {
+	if (ssl_context.session == NULL) {
 		return env.Undefined();
 	}
 
 	unsigned char buf[KEY_BUF_LENGTH];
-	mbedtls_pk_context pk = session->peer_cert->pk;
+	mbedtls_pk_context pk = ssl_context.session->peer_cert->pk;
 	int ret = mbedtls_pk_write_pubkey_der(&pk, buf, KEY_BUF_LENGTH);
 
 	if (ret < 0) {
@@ -102,15 +105,13 @@ Napi::Value DtlsSocket::GetPublicKey(const Napi::CallbackInfo& info) {
 
 Napi::Value DtlsSocket::GetPublicKeyPEM(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
-	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
 
-	mbedtls_ssl_session *session = socket->ssl_context.session;
-	if (session == NULL || session->peer_cert == NULL) {
+	if (ssl_context.session == NULL || ssl_context.session->peer_cert == NULL) {
 		return env.Undefined();
 	}
 
 	unsigned char buf[KEY_BUF_LENGTH];
-	mbedtls_pk_context pk = session->peer_cert->pk;
+	mbedtls_pk_context pk = ssl_context.session->peer_cert->pk;
 	int ret = mbedtls_pk_write_pubkey_pem(&pk, buf, KEY_BUF_LENGTH);
 
 	if (ret < 0) {
@@ -123,39 +124,34 @@ Napi::Value DtlsSocket::GetPublicKeyPEM(const Napi::CallbackInfo& info) {
 
 Napi::Value DtlsSocket::GetOutCounter(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
-	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
-	return Napi::Buffer<char>::Copy(env, (char *)socket->ssl_context.out_ctr, 8);
+	return Napi::Buffer<char>::Copy(env, (char *) ssl_context.out_ctr, 8);
 }
 
 Napi::Value DtlsSocket::GetSession(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
-	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
-	Napi::Object sess = SessionWrap::CreateFromContext(env, &socket->ssl_context, socket->random);
+	Napi::Object sess = SessionWrap::CreateFromContext(env, &ssl_context, random);
 	return sess;
 }
 
 Napi::Value DtlsSocket::Close(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
-	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
-	int ret = socket->close();
+	int ret = close();
 
 	return Napi::Number::New(env, ret);
 }
 
 Napi::Value DtlsSocket::Send(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
-	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
 
 	Napi::Buffer<unsigned char> send_data_buffer = info[0].As<Napi::Buffer<unsigned char>>();
 	const unsigned char *send_data = (const unsigned char *) send_data_buffer.Data();
-	int ret = socket->send(send_data, send_data_buffer.Length());
+	int ret = send(send_data, send_data_buffer.Length());
 
 	return Napi::Number::New(env, ret);
 }
 
 Napi::Value DtlsSocket::ResumeSession(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
-	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
 
 	Napi::Object sessWrap = info[0].As<Napi::Object>();
 	if (sessWrap.IsEmpty()) {
@@ -163,21 +159,20 @@ Napi::Value DtlsSocket::ResumeSession(const Napi::CallbackInfo& info) {
 	}
 
 	SessionWrap *sess = Napi::ObjectWrap<SessionWrap>::Unwrap(sessWrap);
-	bool ret = socket->resume(sess);
+	bool ret = resume(sess);
 	return Napi::Number::New(env, ret);
 }
 
 Napi::Value DtlsSocket::Renegotiate(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
-	DtlsSocket *socket = Napi::ObjectWrap<DtlsSocket>::Unwrap(info.This().As<Napi::Object>());
 
 	if (info[0].IsUndefined()) {
-		socket->proceed();
+		proceed();
 		return Napi::Boolean::New(env, false);
 	}
 
 	SessionWrap *sess =  Napi::ObjectWrap<SessionWrap>::Unwrap(info[0].As<Napi::Object>());
-	socket->renegotiate(sess);
+	renegotiate(sess);
 
 	return Napi::Boolean::New(env, true);
 }
