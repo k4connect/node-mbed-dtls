@@ -72,13 +72,6 @@ Napi::Value DtlsSocket::ReceiveDataFromNode(const Napi::CallbackInfo& info) {
 	unsigned char buf[RECV_BUF_LENGTH];
 	memset(buf, 0, RECV_BUF_LENGTH); // just to see what is going on in the debug prints
 	unsigned int len = receive_data(buf, RECV_BUF_LENGTH);
-	dump_char_data("Recv", buf, RECV_BUF_LENGTH);
-
-	if (len > 0) {
-		printf("--- SET RESULT TO BUFFER COPY WITH LEN=%d\n", len);
-	} else {
-		printf("--- SET RESULT TO UNDEFINED\n");
-	}
 
 	return len > 0 ? Napi::Buffer<unsigned char>::Copy(env, buf, len) : env.Undefined();
 }
@@ -422,7 +415,6 @@ int DtlsSocket::step() {
 			return 0;
 		} else if (ret != 0) {
 			// bad things
-			mbedtls_ssl_session_reset(&ssl_context);
 			error(ret);
 			return 0;
 		}
