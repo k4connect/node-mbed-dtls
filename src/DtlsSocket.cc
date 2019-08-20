@@ -93,7 +93,7 @@ Napi::Value DtlsSocket::GetPublicKey(const Napi::CallbackInfo& info) {
 	}
 
 	// key is written at the end
-	return Napi::Buffer<char>::Copy(env, (char *)buf + (KEY_BUF_LENGTH - ret), ret);
+	return Napi::Buffer<unsigned char>::Copy(env, buf + (KEY_BUF_LENGTH - ret), ret);
 }
 
 Napi::Value DtlsSocket::GetPublicKeyPEM(const Napi::CallbackInfo& info) {
@@ -112,12 +112,12 @@ Napi::Value DtlsSocket::GetPublicKeyPEM(const Napi::CallbackInfo& info) {
 		return env.Undefined();
 	}
 
-	return Napi::Buffer<char>::Copy(env, (char *)buf, strlen((char *)buf));
+	return Napi::Buffer<unsigned char>::Copy(env, buf, strlen((char *) buf));
 }
 
 Napi::Value DtlsSocket::GetOutCounter(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
-	return Napi::Buffer<char>::Copy(env, (char *) ssl_context.out_ctr, 8);
+	return Napi::Buffer<unsigned char>::Copy(env, ssl_context.out_ctr, 8);
 }
 
 Napi::Value DtlsSocket::GetSession(const Napi::CallbackInfo& info) {
@@ -287,7 +287,7 @@ void DtlsSocket::reset() {
 
 int DtlsSocket::send_encrypted(const unsigned char *buf, size_t len) {
 	send_cb.Call({
-		Napi::Buffer<char>::Copy(env, (char *)buf, len)
+		Napi::Buffer<unsigned char>::Copy(env, (unsigned char *)buf, len)
 	});
 
 	return len;
