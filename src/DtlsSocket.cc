@@ -70,8 +70,8 @@ Napi::Value DtlsSocket::ReceiveDataFromNode(const Napi::CallbackInfo& info) {
 	}
 
 	unsigned char buf[RECV_BUF_LENGTH];
-	memset(buf, 0, RECV_BUF_LENGTH); // just to see what is going on in the debug prints
-	unsigned int len = receive_data(buf, RECV_BUF_LENGTH);
+	memset(buf, 0, RECV_BUF_LENGTH);
+	size_t len = receive_data(buf, RECV_BUF_LENGTH);
 
 	return len > 0 ? Napi::Buffer<unsigned char>::Copy(env, buf, len) : env.Undefined();
 }
