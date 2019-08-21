@@ -21,10 +21,10 @@ Napi::Value DtlsSocket::Initialize(Napi::Env& env, Napi::Object& exports) {
 		InstanceMethod("send", &DtlsSocket::Send),
 		InstanceMethod("resumeSession", &DtlsSocket::ResumeSession),
 		InstanceMethod("renegotiate", &DtlsSocket::Renegotiate),
-		InstanceAccessor("publicKey", &DtlsSocket::GetPublicKey, &DtlsSocket::NopSet),
-		InstanceAccessor("publicKeyPEM", &DtlsSocket::GetPublicKeyPEM, &DtlsSocket::NopSet),
-		InstanceAccessor("outCounter", &DtlsSocket::GetOutCounter, &DtlsSocket::NopSet),
-		InstanceAccessor("session", &DtlsSocket::GetSession, &DtlsSocket::NopSet),
+		InstanceAccessor("publicKey", &DtlsSocket::GetPublicKey, nullptr),
+		InstanceAccessor("publicKeyPEM", &DtlsSocket::GetPublicKeyPEM, nullptr),
+		InstanceAccessor("outCounter", &DtlsSocket::GetOutCounter, nullptr),
+		InstanceAccessor("session", &DtlsSocket::GetSession, nullptr),
 	});
 
 	constructor = Napi::Persistent(func);

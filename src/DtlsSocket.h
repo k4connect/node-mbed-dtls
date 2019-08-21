@@ -16,7 +16,6 @@ class DtlsSocket : public Napi::ObjectWrap<DtlsSocket> {
 public:
 	static Napi::Value Initialize(Napi::Env& env, Napi::Object& target);
 	static Napi::Object New(const Napi::CallbackInfo& info);
-	inline void NopSet(const Napi::CallbackInfo& info, const Napi::Value& value) {}
 	Napi::Value ReceiveDataFromNode(const Napi::CallbackInfo& info);
 	Napi::Value Close(const Napi::CallbackInfo& info);
 	Napi::Value Send(const Napi::CallbackInfo& info);
