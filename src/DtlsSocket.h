@@ -29,9 +29,9 @@ public:
 	int send_encrypted(const unsigned char *buf, size_t len);
 	int recv(unsigned char *buf, size_t len);
 	int send(const unsigned char *buf, size_t len);
-	int receive_data(unsigned char *buf, int len);
+	int receive_data(unsigned char *buf, size_t len);
 	int step();
-	void store_data(const unsigned char *buf, size_t len);
+	int store_data(const unsigned char *buf, size_t len);
 	int close();
 	void error(int ret);
 	void reset();

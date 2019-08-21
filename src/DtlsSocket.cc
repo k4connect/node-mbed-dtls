@@ -316,7 +316,7 @@ int DtlsSocket::send(const unsigned char *buf, size_t len) {
 	return ret;
 }
 
-int DtlsSocket::receive_data(unsigned char *buf, int len) {
+int DtlsSocket::receive_data(unsigned char *buf, size_t len) {
 	int ret;
 
 	if (ssl_context.state == MBEDTLS_SSL_HANDSHAKE_OVER) {
@@ -441,15 +441,20 @@ void DtlsSocket::error(int ret) {
 	});
 }
 
-void DtlsSocket::store_data(const unsigned char *buf, size_t len) {
+int DtlsSocket::store_data(const unsigned char *buf, size_t len) {
 	if (recv_buf == nullptr) {
 		recv_buf = (unsigned char *) malloc(len);
 	} else if (recv_len < len) {
 		recv_buf = (unsigned char *) realloc(recv_buf, len);
 	}
 
+	if (recv_buf == nullptr) {
+		return 0;
+	}
+
 	memcpy(recv_buf, buf, len);
 	recv_len = len;
+	return len;
 }
 
 int DtlsSocket::close() {
