@@ -35,29 +35,6 @@ Napi::Value DtlsSocket::Initialize(Napi::Env& env, Napi::Object& exports) {
 	return exports;
 }
 
-
-Napi::Object DtlsSocket::New(const Napi::CallbackInfo& info) {
-	Napi::Env env = info.Env();
-	Napi::EscapableHandleScope scope(env);
-
-	if (info.Length() < 6) {
-		throw Napi::TypeError::New(env, "DtlsSocket requires six arguments");
-	}
-
-	// TODO check arguments types
-
-	Napi::Object server = info[0].As<Napi::Object>();
-	Napi::Value client_ip = info[1].As<Napi::String>();
-	Napi::Function send_cb = info[2].As<Napi::Function>();
-	Napi::Function hs_cb = info[3].As<Napi::Function>();
-	Napi::Function error_cb = info[4].As<Napi::Function>();
-	Napi::Function resume_cb = info[5].As<Napi::Function>();
-
-	Napi::Object obj = constructor.New({ server, client_ip, send_cb, hs_cb, error_cb, resume_cb });
-
-	return scope.Escape(napi_value(obj)).ToObject();
-}
-
 Napi::Value DtlsSocket::ReceiveDataFromNode(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
 	Napi::HandleScope scope(env);
@@ -185,10 +162,9 @@ DtlsSocket::DtlsSocket(const Napi::CallbackInfo& info) :
 		env(info.Env()) {
 	DtlsServer *server = Napi::ObjectWrap<DtlsServer>::Unwrap(info[0].As<Napi::Object>());
 	std::string client_ip = (std::string) info[1].As<Napi::String>();
-
 	send_cb = Napi::Persistent(info[2].As<Napi::Function>());
-	error_cb = Napi::Persistent(info[3].As<Napi::Function>());
-	handshake_cb = Napi::Persistent(info[4].As<Napi::Function>());
+	handshake_cb = Napi::Persistent(info[3].As<Napi::Function>());
+	error_cb = Napi::Persistent(info[4].As<Napi::Function>());
 	resume_sess_cb = Napi::Persistent(info[5].As<Napi::Function>());
 	session_wait = false;
 	recv_buf = nullptr;
