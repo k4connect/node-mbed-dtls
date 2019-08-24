@@ -55,8 +55,7 @@ DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsSe
 
 	Napi::Buffer<unsigned char> key_buffer = info[0].As<Napi::Buffer<unsigned char>>();
 	size_t key_len = key_buffer.Length();
-	unsigned char * key = (unsigned char *) malloc(key_len);
-	memcpy(key, (unsigned char *) key_buffer.Data(), key_len);
+	unsigned char * key = key_buffer.Data();
 
 	int debug_level = 0;
 	if (info.Length() > 1) {
@@ -80,7 +79,6 @@ DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsSe
 
 	/** This, as is, will not work for PEM keys, only DER */
 	int parse_key_result = mbedtls_pk_parse_key(&pkey, key, key_len, NULL, 0);
-	free(key);
 	CHECK_MBEDTLS(parse_key_result);
 
 	CHECK_MBEDTLS(mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers)));
