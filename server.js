@@ -57,7 +57,7 @@ class DtlsServer extends EventEmitter {
 			this.once('close', callback);
 		}
 		this._closing = true;
-		this._endSockets();
+		this._closeSocket();
 	}
 
 	address() {
@@ -282,10 +282,6 @@ class DtlsServer extends EventEmitter {
 				s.end();
 			}
 		});
-
-		if (sockets.length === 0) {
-			this._closeSocket();
-		}
 	}
 
 	_socketClosed() {
