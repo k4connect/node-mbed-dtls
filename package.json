@@ -8,7 +8,7 @@
     "debug": "node-gyp rebuild -j 8 --debug",
     "clean": "node-gyp clean",
     "install": "node-gyp rebuild",
-    "test": "mocha test/server.js"
+    "test": "mocha **/*.test.js"
   },
   "author": "Bryce Kahle",
   "license": "Apache-2.0",

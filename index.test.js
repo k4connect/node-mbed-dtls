@@ -1,15 +1,15 @@
 'use strict';
 
-var path = require('path');
-var should = require('should');
-var sinon = require('sinon');
-var assert = require('assert');
+const path = require('path');
+const should = require('should');
+const sinon = require('sinon');
+const assert = require('assert');
 
-var dtls = require('../index');
+const dtls = require('./index');
 
 const opts = {
-	cert: path.join(__dirname, 'public.der'),
-	key: path.join(__dirname, 'private.der')
+	cert: path.join(__dirname, 'test/public.der'),
+	key: path.join(__dirname, 'test/private.der')
 };
 
 describe('createServer', function() {
@@ -49,17 +49,6 @@ describe('createServer', function() {
 		s2.listen(5683);
 	});
 });
-
-
-function check(f, done) {
-	try {
-		f();
-		done();
-	} catch (e) {
-		done(e);
-	}
-}
-
 
 function checkFinally(f, g, done) {
 	try {
