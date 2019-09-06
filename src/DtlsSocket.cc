@@ -40,10 +40,8 @@ Napi::Value DtlsSocket::ReceiveDataFromNode(const Napi::CallbackInfo& info) {
 	Napi::HandleScope scope(env);
 
 	if (info.Length() >= 1 && info[0].IsBuffer()) {
-		Napi::Buffer<unsigned char> recv_buffer = info[0].As<Napi::Buffer<unsigned char>>();
-		const unsigned char *recv_data = (unsigned char *) recv_buffer.Data();
-		size_t recv_len = recv_buffer.Length();
-		store_data(recv_data, recv_len);
+		Napi::Buffer<unsigned char> recv = info[0].As<Napi::Buffer<unsigned char>>();
+		store_data(reinterpret_cast<unsigned char *>(recv.Data()), recv.Length());
 	}
 
 	unsigned char buf[RECV_BUF_LENGTH];
@@ -112,11 +110,8 @@ Napi::Value DtlsSocket::Close(const Napi::CallbackInfo& info) {
 
 Napi::Value DtlsSocket::Send(const Napi::CallbackInfo& info) {
 	Napi::Env env = info.Env();
-
-	Napi::Buffer<unsigned char> send_data_buffer = info[0].As<Napi::Buffer<unsigned char>>();
-	const unsigned char *send_data = (const unsigned char *) send_data_buffer.Data();
-	int ret = send(send_data, send_data_buffer.Length());
-
+	Napi::Buffer<unsigned char> buf = info[0].As<Napi::Buffer<unsigned char>>();
+	int ret = send(buf.Data(), buf.Length());
 	return Napi::Number::New(env, ret);
 }
 
