@@ -1,9 +1,13 @@
 'use strict';
 
+const chai = require('chai')
 const path = require('path');
+const fs = require('fs');
 const should = require('should');
 const sinon = require('sinon');
 const assert = require('assert');
+
+const expect = chai.expect;
 
 const dtls = require('./index');
 
