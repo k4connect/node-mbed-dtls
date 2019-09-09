@@ -1,6 +1,5 @@
 
 #include "DtlsServer.h"
-
 #include <stdio.h>
 #include <sys/time.h>
 #define mbedtls_printf     printf
@@ -33,6 +32,7 @@ Napi::Object DtlsServer::Initialize(Napi::Env env, Napi::Object exports) {
 
 	Napi::Function func = DefineClass(env, "DtlsServer", {
 		InstanceAccessor("handshakeTimeoutMin", &DtlsServer::GetHandshakeTimeoutMin, &DtlsServer::SetHandshakeTimeoutMin),
+		InstanceAccessor("handshakeTimeoutMax", &DtlsServer::GetHandshakeTimeoutMax, &DtlsServer::SetHandshakeTimeoutMax),
 	});
 
 	constructor = Napi::Persistent(func);
@@ -46,6 +46,18 @@ Napi::Object DtlsServer::Initialize(Napi::Env env, Napi::Object exports) {
 DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsServer>(info) {
 	Napi::Env env = info.Env();
 	Napi::HandleScope scope(env);
+
+	// init first so our constructor does not segfault
+	const char *pers = "dtls_server";
+	mbedtls_ssl_config_init(&conf);
+	mbedtls_ssl_cookie_init(&cookie_ctx);
+#if defined(MBEDTLS_SSL_CACHE_C)
+	mbedtls_ssl_cache_init(&cache);
+#endif
+	mbedtls_x509_crt_init(&srvcert);
+	mbedtls_pk_init(&pkey);
+	mbedtls_entropy_init(&entropy);
+	mbedtls_ctr_drbg_init(&ctr_drbg);
 
 	// Required 1st param: key
 	if (info.Length() < 1 || !info[0].IsBuffer()) {
@@ -61,17 +73,6 @@ DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsSe
 	if (info.Length() > 1) {
 		debug_level = info[1].ToNumber().Uint32Value();
 	}
-
-	const char *pers = "dtls_server";
-	mbedtls_ssl_config_init(&conf);
-	mbedtls_ssl_cookie_init(&cookie_ctx);
-#if defined(MBEDTLS_SSL_CACHE_C)
-	mbedtls_ssl_cache_init(&cache);
-#endif
-	mbedtls_x509_crt_init(&srvcert);
-	mbedtls_pk_init(&pkey);
-	mbedtls_entropy_init(&entropy);
-	mbedtls_ctr_drbg_init(&ctr_drbg);
 
 #if defined(MBEDTLS_DEBUG_C)
 	mbedtls_debug_set_threshold(debug_level);
@@ -103,16 +104,6 @@ DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsSe
 	mbedtls_ssl_conf_certificate_send(&conf, MBEDTLS_SSL_SEND_CERTIFICATE_DISABLED);
 }
 
-Napi::Value DtlsServer::GetHandshakeTimeoutMin(const Napi::CallbackInfo& info) {
-	Napi::Env env = info.Env();
-	return Napi::Number::New(env, this->config()->hs_timeout_min);
-}
-
-void DtlsServer::SetHandshakeTimeoutMin(const Napi::CallbackInfo& info, const Napi::Value& value) {
-	uint32_t hs_timeout_min = value.As<Napi::Number>().Uint32Value();
-	mbedtls_ssl_conf_handshake_timeout(this->config(), hs_timeout_min, this->config()->hs_timeout_max);
-}
-
 DtlsServer::~DtlsServer() {
 	mbedtls_x509_crt_free( &srvcert );
 	mbedtls_pk_free( &pkey );
@@ -123,4 +114,24 @@ DtlsServer::~DtlsServer() {
 #endif
 	mbedtls_ctr_drbg_free( &ctr_drbg );
 	mbedtls_entropy_free( &entropy );
+}
+
+Napi::Value DtlsServer::GetHandshakeTimeoutMin(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	return Napi::Number::New(env, this->config()->hs_timeout_min);
+}
+
+Napi::Value DtlsServer::GetHandshakeTimeoutMax(const Napi::CallbackInfo& info) {
+	Napi::Env env = info.Env();
+	return Napi::Number::New(env, this->config()->hs_timeout_max);
+}
+
+void DtlsServer::SetHandshakeTimeoutMin(const Napi::CallbackInfo& info, const Napi::Value& value) {
+	uint32_t hs_timeout_min = value.As<Napi::Number>().Uint32Value();
+	mbedtls_ssl_conf_handshake_timeout(this->config(), hs_timeout_min, this->config()->hs_timeout_max);
+}
+
+void DtlsServer::SetHandshakeTimeoutMax(const Napi::CallbackInfo& info, const Napi::Value& value) {
+	uint32_t hs_timeout_max = value.As<Napi::Number>().Uint32Value();
+	mbedtls_ssl_conf_handshake_timeout(this->config(), this->config()->hs_timeout_min, hs_timeout_max);
 }

@@ -44,7 +44,9 @@ private:
 	mbedtls_ssl_cache_context cache;
 #endif
 	void SetHandshakeTimeoutMin(const Napi::CallbackInfo& info, const Napi::Value& value);
+	void SetHandshakeTimeoutMax(const Napi::CallbackInfo& info, const Napi::Value& value);
 	Napi::Value GetHandshakeTimeoutMin(const Napi::CallbackInfo& info);
+	Napi::Value GetHandshakeTimeoutMax(const Napi::CallbackInfo& info);
 };
 
 #endif
