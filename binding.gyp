@@ -148,6 +148,7 @@
       },
       "sources": [
         "src/init.cc",
+        "src/Constants.cc",
         "src/DtlsServer.cc",
         "src/DtlsSocket.cc",
         "src/SessionWrap.cc"
