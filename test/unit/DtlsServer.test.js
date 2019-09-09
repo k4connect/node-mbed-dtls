@@ -70,7 +70,7 @@ describe('DtlsServer', function() {
 				server = new DtlsServer(key);
 			});
 
-			it('should have a default value of 1000ms', function () {
+			it('should have a default value of 60000ms', function () {
 				expect(server.handshakeTimeoutMax).to.equal(60000);
 			});
 
