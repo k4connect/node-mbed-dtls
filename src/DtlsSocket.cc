@@ -251,9 +251,10 @@ bool DtlsSocket::resume(SessionWrap *sess) {
   memcpy(ssl_context.session_negotiate->id, sess->id, sess->id_len);
 
   ssl_context.session_negotiate->ciphersuite = sess->ciphersuite;
-  ssl_context.transform_negotiate->ciphersuite_info = mbedtls_ssl_ciphersuite_from_id(sess->ciphersuite);
 
-  if (!ssl_context.transform_negotiate->ciphersuite_info)
+  ssl_context.handshake->ciphersuite_info = mbedtls_ssl_ciphersuite_from_id(sess->ciphersuite);
+
+  if (!ssl_context.handshake->ciphersuite_info)
   {
     error(MBEDTLS_ERR_SSL_NO_USABLE_CIPHERSUITE);
     return false;

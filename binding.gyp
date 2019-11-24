@@ -15,6 +15,7 @@
       ],
       "include_dirs": [
         "mbedtls/include",
+        "mbedtls/crypto/include",
         "config"
       ],
       "defines": [
@@ -37,70 +38,7 @@
       ],
       "include_dirs": [
         "mbedtls/include",
-        "config"
-      ],
-      "defines": [
-        "MBEDTLS_CONFIG_FILE=\"node_dtls_conf.h\""
-      ]
-    },
-    {
-      "target_name": "mbedcrypto",
-      "type": "static_library",
-      "sources": [
-        "mbedtls/library/aes.c",
-        "mbedtls/library/aesni.c",
-        "mbedtls/library/arc4.c",
-        "mbedtls/library/asn1parse.c",
-        "mbedtls/library/asn1write.c",
-        "mbedtls/library/base64.c",
-        "mbedtls/library/bignum.c",
-        "mbedtls/library/blowfish.c",
-        "mbedtls/library/camellia.c",
-        "mbedtls/library/ccm.c",
-        "mbedtls/library/cipher.c",
-        "mbedtls/library/cipher_wrap.c",
-        "mbedtls/library/ctr_drbg.c",
-        "mbedtls/library/des.c",
-        "mbedtls/library/dhm.c",
-        "mbedtls/library/ecdh.c",
-        "mbedtls/library/ecdsa.c",
-        "mbedtls/library/ecp.c",
-        "mbedtls/library/ecp_curves.c",
-        "mbedtls/library/entropy.c",
-        "mbedtls/library/entropy_poll.c",
-        "mbedtls/library/error.c",
-        "mbedtls/library/gcm.c",
-        "mbedtls/library/havege.c",
-        "mbedtls/library/hmac_drbg.c",
-        "mbedtls/library/md.c",
-        "mbedtls/library/md2.c",
-        "mbedtls/library/md4.c",
-        "mbedtls/library/md5.c",
-        "mbedtls/library/md_wrap.c",
-        "mbedtls/library/memory_buffer_alloc.c",
-        "mbedtls/library/oid.c",
-        "mbedtls/library/padlock.c",
-        "mbedtls/library/pem.c",
-        "mbedtls/library/pk.c",
-        "mbedtls/library/pk_wrap.c",
-        "mbedtls/library/pkcs12.c",
-        "mbedtls/library/pkcs5.c",
-        "mbedtls/library/pkparse.c",
-        "mbedtls/library/pkwrite.c",
-        "mbedtls/library/platform.c",
-        "mbedtls/library/ripemd160.c",
-        "mbedtls/library/rsa.c",
-        "mbedtls/library/sha1.c",
-        "mbedtls/library/sha256.c",
-        "mbedtls/library/sha512.c",
-        "mbedtls/library/threading.c",
-        "mbedtls/library/timing.c",
-        "mbedtls/library/version.c",
-        "mbedtls/library/version_features.c",
-        "mbedtls/library/xtea.c"
-      ],
-      "include_dirs": [
-        "mbedtls/include",
+        "mbedtls/crypto/include",
         "config"
       ],
       "defines": [
@@ -119,12 +57,12 @@
       "include_dirs": [
         "<!(node -e \"require('nan')\")",
         "mbedtls/include",
+        "mbedtls/crypto/include",
         "config"
       ],
       "dependencies": [
         "mbedtls",
-        "mbedx509",
-        "mbedcrypto"
+        "mbedx509"
       ],
       "defines": [
         "MBEDTLS_CONFIG_FILE=\"node_dtls_conf.h\""
