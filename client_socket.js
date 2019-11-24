@@ -31,7 +31,16 @@ class DtlsClientSocket extends stream.Duplex {
 
     this.remoteAddress = options.host;
     this.remotePort    = options.port;
-    this.dgramSocket   = options.socket || dgram.createSocket('udp4');
+    this.ip6ip4select  = options.ip6ip4select;
+    
+    if (options.socket) {
+      this.dgramSocket = options.socket;
+    } else if (this.ip6ip4select === 'ip6') {
+      this.dgramSocket = dgram.createSocket('udp6');
+    } else {
+      this.dgramSocket = dgram.createSocket('udp4');
+    }
+
     this._onMessage    = this._onMessage.bind(this);
 
     this.dgramSocket.on('message', this._onMessage);
