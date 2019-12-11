@@ -120,7 +120,8 @@ Napi::Value DtlsSocket::ResumeSession(const Napi::CallbackInfo& info) {
 
 	Napi::Object sessWrap = info[0].As<Napi::Object>();
 	if (sessWrap.IsEmpty()) {
-		throw Napi::TypeError::New(env, "ResumeSession requires one argument, was null");
+		error("ResumeSession requires one argument, was null");
+		return Napi::Number::New(env, 0);
 	}
 
 	SessionWrap *sess = Napi::ObjectWrap<SessionWrap>::Unwrap(sessWrap);
@@ -409,6 +410,13 @@ void DtlsSocket::error(int ret) {
 	error_cb.Call({
 		Napi::Number::New(env, ret),
 		Napi::String::New(env, error_buf)
+	});
+}
+
+void DtlsSocket::error(const char *buf) {
+	error_cb.Call({
+		Napi::Number::New(env, 0),
+		Napi::String::New(env, buf)
 	});
 }
 

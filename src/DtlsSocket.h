@@ -34,6 +34,7 @@ public:
 	int store_data(const unsigned char *buf, size_t len);
 	int close();
 	void error(int ret);
+	void error(const char *buf);
 	void reset();
 	void get_session_cache(mbedtls_ssl_session *session);
 	void renegotiate(SessionWrap *sess);
