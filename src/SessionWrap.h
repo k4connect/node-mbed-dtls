@@ -6,7 +6,7 @@
 #include "mbedtls/ssl.h"
 
 #define ID_LENGTH 32
-#define MASTER_LENGTH 96
+#define MASTER_LENGTH 48
 #define RANDBYTES_LENGTH 64
 #define OUT_CR_LENGTH 8
 

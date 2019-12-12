@@ -62,7 +62,7 @@ Napi::Value SessionWrap::Restore(const Napi::CallbackInfo& info) {
 	session->id_len = idv_length;
 
 	Napi::Object masterv = object.Get("master").ToObject();
-	size_t masterv_length = rbv.As<Napi::Buffer<char>>().Length();
+	size_t masterv_length = masterv.As<Napi::Buffer<char>>().Length();
 	if (masterv_length > MASTER_LENGTH) {
 		throw Napi::RangeError::New(env, "master value length greater than allowed");
 	}
@@ -70,7 +70,7 @@ Napi::Value SessionWrap::Restore(const Napi::CallbackInfo& info) {
 	session->in_epoch = object.Get("in_epoch").As<Napi::Number>().Uint32Value();
 
 	Napi::Object out_ctrv = object.Get("out_ctr").ToObject();
-	size_t out_ctrv_length = rbv.As<Napi::Buffer<char>>().Length();
+	size_t out_ctrv_length = out_ctrv.As<Napi::Buffer<char>>().Length();
 	if (out_ctrv_length > OUT_CR_LENGTH) {
 		throw Napi::RangeError::New(env, "out_ctr value length greater than allowed");
 	}
