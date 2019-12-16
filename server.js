@@ -150,8 +150,10 @@ class DtlsServer extends EventEmitter {
 							// for details:
 							// https://s.slack.com/archives/CKRRAGTSB/p1576283554014400?thread_ts=1575905941.123800&cid=CKRRAGTSB
 							//
-							// For now we're discarding previously received messages and letting the client retransmit them.
-							this._clearMoveSessionMessages(key);
+							// Technically, the session has been moved successfully though, so we can now process queued messages
+							// which were received from the new device address
+							this._debug(`ipChanged not handled, ip=${key}`);
+							this._processMoveSessionMessages(key);
 						}
 					} else {
 						this._debug(`handleIpChange: message not successfully received, NOT changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
