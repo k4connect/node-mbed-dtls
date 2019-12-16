@@ -188,8 +188,9 @@ class DtlsServer extends EventEmitter {
 
 	_processNextMoveSessionMessage(key, messages) {
 		if (messages.length) {
-			// Process next message asynchronously
 			const m = messages.shift();
+			// Process queued messages one by one asynchronously so that each client gets a fair share of
+			// the server time
 			setImmediate(() => {
 				this._debug(`Processing queued MoveSession message, ip=${key}`);
 				this._onMessage(m.msg, m.rinfo, (client, received) => {
