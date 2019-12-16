@@ -16,8 +16,8 @@ class DtlsServer extends EventEmitter {
 		this.options = options = Object.assign({
 			sendClose: true
 		}, options);
-
 		this.sockets = {};
+		this._moveSessionMessages = new Map();
 		this.dgramSocket = dgram.createSocket('udp4');
 		this._onMessage = this._onMessage.bind(this);
 		this.listening = false;
@@ -93,6 +93,14 @@ class DtlsServer extends EventEmitter {
 	}
 
 	_handleIpChange(msg, key, rinfo, deviceId) {
+		// Check if another MoveSession packet from the same device is being processed already
+		const messages = this._moveSessionMessages.get(key);
+		if (messages) {
+			this._debug(`Enqueuing MoveSession message, ip=${key}`);
+			messages.push({ msg, rinfo });
+			return true;
+		}
+		this._moveSessionMessages.set(key, []);
 		const lookedUp = this.emit('lookupKey', deviceId, (err, oldRinfo) => {
 			if (!err && oldRinfo) {
 				if (rinfo.address === oldRinfo.address && rinfo.port === oldRinfo.port) {
@@ -103,7 +111,10 @@ class DtlsServer extends EventEmitter {
 					this._debug(`handleIpChange: ignoring ip change because address did not change ip=${key}, deviceID=${deviceId}`);
 					this._onMessage(msg, rinfo, (client, received) => {
 						// 'received' is true or false based on whether the message is pushed into the stream
-						if (!received) {
+						if (received) {
+							this._processMoveSessionMessages(key);
+						} else {
+							this._clearMoveSessionMessages(key);
 							this.emit('forceDeviceRehandshake', rinfo, deviceId);
 						}
 					});
@@ -111,7 +122,7 @@ class DtlsServer extends EventEmitter {
 					return;
 				}
 				// The IP and/or port have changed
-				// Attempt to send to oldRinfo which will 
+				// Attempt to send to oldRinfo which will
 				// a) attempt session resumption (if the client with old address and port doesnt exist yet)
 				// b) attempt to send the message to the old old address and port
 				this._onMessage(msg, oldRinfo, (client, received) => {
@@ -126,9 +137,25 @@ class DtlsServer extends EventEmitter {
 						this.sockets[key] = client;
 						delete this.sockets[oldKey];
 						// tell the world
-						client.emit('ipChanged', oldRinfo);
+						const hasHandler = client.emit('ipChanged', oldRinfo, err => {
+							// Keep queueing messages until the cached session data is updated
+							if (!err) {
+								this._processMoveSessionMessages(key);
+							} else {
+								this._clearMoveSessionMessages(key);
+							}
+						});
+						if (!hasHandler) {
+							// FIXME: The client socket may not have a handler registered for its 'ipChanged' events, see this thread
+							// for details:
+							// https://s.slack.com/archives/CKRRAGTSB/p1576283554014400?thread_ts=1575905941.123800&cid=CKRRAGTSB
+							//
+							// For now we're discarding previously received messages and letting the client retransmit them.
+							this._clearMoveSessionMessages(key);
+						}
 					} else {
 						this._debug(`handleIpChange: message not successfully received, NOT changing ip address fromip=${oldKey}, toip=${key}, deviceID=${deviceId}`);
+						this._clearMoveSessionMessages(key);
 						this.emit('forceDeviceRehandshake', rinfo, deviceId);
 					}
 				});
@@ -138,17 +165,56 @@ class DtlsServer extends EventEmitter {
 				// This cloud-side solution was discovered by Eli Thomas which caused
 				// mbedTLS to fail a socket read and initiate a handshake.
 				this._debug(`Device in 'move session' lock state attempting to force it to re-handshake deviceID=${deviceId}`);
-
+				this._clearMoveSessionMessages(key);
 				//Always EMIT this event instead of calling _forceDeviceRehandshake internally this allows the DS to device wether to send the packet or not to the device
 				this.emit('forceDeviceRehandshake', rinfo, deviceId);
 			}
 		});
+		if (!lookedUp) {
+			this._clearMoveSessionMessages(key);
+		}
 		return lookedUp;
+	}
+
+	_processMoveSessionMessages(key) {
+		const messages = this._moveSessionMessages.get(key);
+		if (messages) {
+			this._moveSessionMessages.delete(key);
+			this._processNextMoveSessionMessage(key, messages);
+		}
+	}
+
+	_processNextMoveSessionMessage(key, messages) {
+		if (messages.length) {
+			// Process next message asynchronously
+			const m = messages.shift();
+			setImmediate(() => {
+				this._debug(`Processing queued MoveSession message, ip=${key}`);
+				this._onMessage(m.msg, m.rinfo, (client, received) => {
+					if (received) {
+						this._processNextMoveSessionMessage(key, messages);
+					} else {
+						this._debug(`Discarding queued MoveSession messages, ip=${key}`);
+					}
+				});
+			});
+		}
+	}
+
+	_clearMoveSessionMessages(key) {
+		// Print a warning if the queue is not empty
+		if (this.options.debug) {
+			const messages = this._moveSessionMessages.get(key);
+			if (messages && messages.length) {
+				this._debug(`Discarding queued MoveSession messages, ip=${key}`);
+			}
+		}
+		this._moveSessionMessages.delete(key);
 	}
 
 	_forceDeviceRehandshake(rinfo, deviceId){
 		this._debug(`Attempting force re-handshake by sending malformed hello request packet to deviceID=${deviceId}`);
-		
+
 		// Construct the 'session killing' Avada Kedavra packet
 		const malformedHelloRequest = Buffer.from([
 			0x16,                                 // Handshake message type 22
