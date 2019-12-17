@@ -136,8 +136,11 @@ class DtlsServer extends EventEmitter {
 						// move in lookup table
 						this.sockets[key] = client;
 						delete this.sockets[oldKey];
-						// tell the world
-						const hasHandler = client.emit('ipChanged', oldRinfo, err => {
+						// update cached session
+						let updatePending = false;
+						client.emit('ipChanged', oldRinfo, () => {
+							updatePending = true;
+						}, err => {
 							// Keep queueing messages until the cached session data is updated
 							if (!err) {
 								this._processMoveSessionMessages(key);
@@ -145,7 +148,7 @@ class DtlsServer extends EventEmitter {
 								this._clearMoveSessionMessages(key);
 							}
 						});
-						if (!hasHandler) {
+						if (!updatePending) {
 							// FIXME: The client socket may not have a handler registered for its 'ipChanged' events, see this thread
 							// for details:
 							// https://s.slack.com/archives/CKRRAGTSB/p1576283554014400?thread_ts=1575905941.123800&cid=CKRRAGTSB
