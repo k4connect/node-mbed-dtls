@@ -47,6 +47,9 @@ private:
 	void SetHandshakeTimeoutMax(const Napi::CallbackInfo& info, const Napi::Value& value);
 	Napi::Value GetHandshakeTimeoutMin(const Napi::CallbackInfo& info);
 	Napi::Value GetHandshakeTimeoutMax(const Napi::CallbackInfo& info);
+	Napi::FunctionReference psk_cb;
+	bool has_psk = false;
+
 };
 
 #endif
