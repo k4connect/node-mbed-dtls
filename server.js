@@ -308,6 +308,7 @@ class DtlsServer extends EventEmitter {
 	}
 
 	_createSocket(rinfo, key, selfRestored) {
+		console.log('NEW DTLSSOCKET: ', rinfo.address, rinfo.port);
 		var client = new DtlsSocket(this, rinfo.address, rinfo.port);
 		client.sendClose = this.options.sendClose;
 		client.selfRestored = selfRestored;
