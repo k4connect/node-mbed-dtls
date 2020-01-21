@@ -126,7 +126,7 @@ DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsSe
 
 	CHECK_MBEDTLS(mbedtls_ssl_cookie_setup(&cookie_ctx, mbedtls_ctr_drbg_random, &ctr_drbg));
 
-	mbedtls_ssl_conf_dtls_cookies(&conf, mbedtls_ssl_cookie_write, mbedtls_ssl_cookie_check, &cookie_ctx);
+	mbedtls_ssl_conf_dtls_cookies(&conf, NULL, NULL, &cookie_ctx);
 	mbedtls_ssl_conf_authmode(&conf, MBEDTLS_SSL_VERIFY_OPTIONAL);
 
 	static int ssl_cert_types[] = { MBEDTLS_TLS_CERT_TYPE_RAW_PUBLIC_KEY, MBEDTLS_TLS_CERT_TYPE_NONE };
