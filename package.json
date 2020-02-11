@@ -1,6 +1,6 @@
 {
   "name": "node-mbed-dtls",
-  "version": "3.0.0-rc.7",
+  "version": "4.0.0",
   "description": "Node mbed DTLS",
   "main": "index.js",
   "scripts": {
@@ -11,6 +11,9 @@
     "test": "mocha **/*.test.js"
   },
   "author": "Bryce Kahle",
+  "contributors": [
+    "Kyle Strickland <kyle@k4connect.com>"
+  ],
   "license": "Apache-2.0",
   "gypfile": true,
   "dependencies": {
@@ -20,7 +23,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/spark/node-mbed-dtls.git"
+    "url": "git+https://github.com/k4connect/node-mbed-dtls.git"
   },
   "devDependencies": {
     "mocha": "^2.3.3",

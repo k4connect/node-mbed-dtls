@@ -18,7 +18,7 @@ class DtlsServer extends EventEmitter {
 		}, options);
 		this.sockets = {};
 		this._moveSessionMessages = new Map();
-		this.dgramSocket = dgram.createSocket('udp4');
+		this.dgramSocket = options.socket || dgram.createSocket('udp4');
 		this._onMessage = this._onMessage.bind(this);
 		this.listening = false;
 
@@ -35,14 +35,14 @@ class DtlsServer extends EventEmitter {
 			this._socketClosed();
 		});
 
-		let key = Buffer.isBuffer(options.key) ? options.key : fs.readFileSync(options.key);
+		let key = (Buffer.isBuffer(options.key) || options.key === undefined) ? options.key : fs.readFileSync(options.key);
 		// likely a PEM encoded key, add null terminating byte
 		// 0x2d = '-'
-		if (key[0] === 0x2d && key[key.length - 1] !== 0) {
+		if (key !== undefined && key[0] === 0x2d && key[key.length - 1] !== 0) {
 			key = Buffer.concat([key, Buffer.from([0])]);
 		}
 
-		this.mbedServer = new mbed.DtlsServer(key, options.debug);
+		this.mbedServer = new mbed.DtlsServer(key, options.psk_cb, options.debug);
 		if (options.handshakeTimeoutMin) {
 			this.mbedServer.handshakeTimeoutMin = options.handshakeTimeoutMin;
 		}

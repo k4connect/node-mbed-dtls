@@ -25,6 +25,23 @@ static void my_debug( void *ctx, int level,
 	fflush((FILE *) ctx);
 }
 
+static int psk_cb_wrapper(void *parameter, mbedtls_ssl_context *ssl,
+		const unsigned char *identity, size_t identity_len) {
+	Napi::FunctionReference *p_psk_cb = (Napi::FunctionReference *)parameter;
+
+	Napi::Value ret = p_psk_cb->Call({
+		Napi::Buffer<unsigned char>::Copy(p_psk_cb->Env(), identity, identity_len)
+	});
+
+	if(ret.IsBuffer()) {
+		Napi::Buffer<unsigned char> psk_buffer = ret.As<Napi::Buffer<unsigned char>>();
+		mbedtls_ssl_set_hs_psk(ssl, psk_buffer.Data(), psk_buffer.Length());
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
 Napi::FunctionReference DtlsServer::constructor;
 
 Napi::Object DtlsServer::Initialize(Napi::Env env, Napi::Object exports) {
@@ -44,6 +61,9 @@ Napi::Object DtlsServer::Initialize(Napi::Env env, Napi::Object exports) {
 }
 
 DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsServer>(info) {
+	unsigned char * key = NULL;
+	size_t key_len = 0;
+
 	Napi::Env env = info.Env();
 	Napi::HandleScope scope(env);
 
@@ -59,38 +79,51 @@ DtlsServer::DtlsServer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DtlsSe
 	mbedtls_entropy_init(&entropy);
 	mbedtls_ctr_drbg_init(&ctr_drbg);
 
-	// Required 1st param: key
-	if (info.Length() < 1 || !info[0].IsBuffer()) {
-		Napi::TypeError::New(env, "Expecting first parameter (key) to be a buffer").ThrowAsJavaScriptException();
-		return;
+	// Optional 1st param: key
+	if (info.Length() >= 1 && info[0].IsBuffer()) {
+		Napi::Buffer<unsigned char> key_buffer = info[0].As<Napi::Buffer<unsigned char>>();
+		key_len = key_buffer.Length();
+		key = key_buffer.Data();
 	}
 
-	Napi::Buffer<unsigned char> key_buffer = info[0].As<Napi::Buffer<unsigned char>>();
-	size_t key_len = key_buffer.Length();
-	unsigned char * key = key_buffer.Data();
+	// Optional 2nd param: psk_cb
+	if (info.Length() >= 2 && info[1].IsFunction()) {
+		psk_cb = Napi::Persistent(info[1].As<Napi::Function>());
+		has_psk = true;
+	}
 
+	// Optional 3rd parameter: debug_level
 	int debug_level = 0;
-	if (info.Length() > 1) {
-		debug_level = info[1].ToNumber().Uint32Value();
+	if (info.Length() > 2) {
+		debug_level = info[2].ToNumber().Uint32Value();
 	}
 
 #if defined(MBEDTLS_DEBUG_C)
 	mbedtls_debug_set_threshold(debug_level);
 #endif
 
-	/** This, as is, will not work for PEM keys, only DER */
-	int parse_key_result = mbedtls_pk_parse_key(&pkey, key, key_len, NULL, 0);
-	CHECK_MBEDTLS(parse_key_result);
+	if(key != NULL) {
+		/** This, as is, will not work for PEM keys, only DER */
+		int parse_key_result = mbedtls_pk_parse_key(&pkey, key, key_len, NULL, 0);
+		CHECK_MBEDTLS(parse_key_result);
+	}
 
 	CHECK_MBEDTLS(mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers)));
 	CHECK_MBEDTLS(mbedtls_ssl_config_defaults(&conf, MBEDTLS_SSL_IS_SERVER, MBEDTLS_SSL_TRANSPORT_DATAGRAM, MBEDTLS_SSL_PRESET_DEFAULT));
 
-	mbedtls_ssl_conf_min_version(&conf, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_3);
+	mbedtls_ssl_conf_min_version(&conf, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_2);
 
 	mbedtls_ssl_conf_rng(&conf, mbedtls_ctr_drbg_random, &ctr_drbg);
 	mbedtls_ssl_conf_dbg(&conf, my_debug, stdout);
 
-	CHECK_MBEDTLS(mbedtls_ssl_conf_own_cert(&conf, &srvcert, &pkey));
+	if (key != NULL) {
+		CHECK_MBEDTLS(mbedtls_ssl_conf_own_cert(&conf, &srvcert, &pkey));
+	}
+
+	if (psk_cb != NULL) {
+		mbedtls_ssl_conf_psk_cb(&conf, psk_cb_wrapper, &psk_cb);
+	}
+
 	CHECK_MBEDTLS(mbedtls_ssl_cookie_setup(&cookie_ctx, mbedtls_ctr_drbg_random, &ctr_drbg));
 
 	mbedtls_ssl_conf_dtls_cookies(&conf, mbedtls_ssl_cookie_write, mbedtls_ssl_cookie_check, &cookie_ctx);

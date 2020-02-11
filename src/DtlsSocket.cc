@@ -46,7 +46,7 @@ Napi::Value DtlsSocket::ReceiveDataFromNode(const Napi::CallbackInfo& info) {
 
 	unsigned char buf[RECV_BUF_LENGTH];
 	memset(buf, 0, RECV_BUF_LENGTH);
-	size_t len = receive_data(buf, RECV_BUF_LENGTH);
+	int len = receive_data(buf, RECV_BUF_LENGTH);
 
 	return len > 0 ? Napi::Buffer<unsigned char>::Copy(env, buf, len) : env.Undefined();
 }
@@ -341,54 +341,20 @@ int DtlsSocket::step() {
 	int ret;
 	// handshake
 	while (ssl_context.state != MBEDTLS_SSL_HANDSHAKE_OVER) {
-		ret = mbedtls_ssl_handshake_step(&ssl_context);
-		if (ret == 0) {
-			if (session_wait &&
-				(ssl_context.state == MBEDTLS_SSL_SERVER_HELLO ||
-				 ssl_context.state == MBEDTLS_SSL_HANDSHAKE_WRAPUP)) {
-				return 0;
-			}
-
-			if (ssl_context.state == MBEDTLS_SSL_SERVER_HELLO &&
-					ssl_context.handshake->resume == 0 &&
-					ssl_context.session_negotiate->id_len != 0) {
-				get_session_cache(ssl_context.session_negotiate);
-
-				// copy client random (renegotiation)
-				if (ssl_context.handshake->resume == 1) {
-					memcpy(random, ssl_context.handshake->randbytes, 32);
-				}
-				return 0;
-			}
-
-			// nasty grabbing of server random in renegotiation case
-			if (ssl_context.state == MBEDTLS_SSL_SERVER_CHANGE_CIPHER_SPEC &&
-					ssl_context.handshake->resume == 1) {
-				memcpy(random + 32, ssl_context.out_msg + 6, 32);
-			}
-
-			// normal handshake random grab
-			if (ssl_context.state == MBEDTLS_SSL_SERVER_CERTIFICATE)
-			{
-				memcpy(random, ssl_context.handshake->randbytes, 64);
-			}
-
-			// keep looping to send everything
-			continue;
-		} else if (ret == MBEDTLS_ERR_SSL_HELLO_VERIFY_REQUIRED) {
-			// client will start a new session, so reset things
-			reset();
-			continue;
-		} else if (ret == MBEDTLS_ERR_SSL_WANT_READ) {
-			// we just need more data, so return
-			if (recv_len > 0)
+		ret = mbedtls_ssl_handshake(&ssl_context);
+		switch (ret) {
+			case 0:
+				break;
+			case MBEDTLS_ERR_SSL_WANT_READ:
+			case MBEDTLS_ERR_SSL_WANT_WRITE:
+				return ret;
+			case MBEDTLS_ERR_SSL_HELLO_VERIFY_REQUIRED:
+				reset();
 				continue;
-
-			return 0;
-		} else if (ret != 0) {
-			// bad things
-			error(ret);
-			return 0;
+			default:
+				// bad things
+				error(ret);
+				return 0;
 		}
 	}
 
