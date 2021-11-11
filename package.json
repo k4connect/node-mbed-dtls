@@ -1,6 +1,6 @@
 {
-  "name": "node-mbed-dtls",
-  "version": "4.1.0",
+  "name": "@k4connect/node-mbed-dtls",
+  "version": "4.1.1",
   "description": "Node mbed DTLS",
   "main": "index.js",
   "scripts": {
