@@ -1,6 +1,6 @@
 {
-  "name": "node-mbed-dtls",
-  "version": "4.1.0",
+  "name": "@k4connect/node-mbed-dtls",
+  "version": "4.1.2",
   "description": "Node mbed DTLS",
   "main": "index.js",
   "scripts": {
@@ -20,10 +20,6 @@
     "bindings": "^1.5.0",
     "chai": "^4.2.0",
     "node-addon-api": "^1.6.3"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/k4connect/node-mbed-dtls.git"
   },
   "devDependencies": {
     "mocha": "^2.3.3",
